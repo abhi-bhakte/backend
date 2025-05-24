@@ -1,0 +1,28 @@
+{
+  "composting_emissions": {
+      "IPCC_default_values": {
+          "CH4_kg_per_ton": 4,
+          "N2O_kg_per_ton": 0.3
+      }
+  },
+  "fuel_data": {
+        "Fuel Type": ["LPG", "Gasoline", "Kerosene", "Diesel", "Natural Gas"],
+        "Energy Content (MJ/L)": [25.07, 35.44, 35.28, 36.37, 0.03],
+        "CO2 Emission Factor (kg/MJ)": [0.0631, 0.0693, 0.0716, 0.0741, 0.056],
+        "CH4 Emission Factor (kg/MJ)": [0.000003, 0.000003, 0.000003, 0.000003, 0.0000003],
+        "N2O Emission Factor (kg/MJ)": [0.0000006, 0.0000006, 0.0000006, 0.0000006, 0.0000001],
+        "BC Emissions (kg/MJ)": [0.0000234, 0.0000234, 0.0000234, 0.0000234, 0.00000005],
+        "Fuel Density (kg/L)": [0.53, 0.8, 0.8, 0.84, 0.00074]
+    },
+  "fertilizer_production_emissions": {
+      "fertilizer_types": ["N fertilizer", "P2O5", "K2O", "Total"],
+      "ferti_replaced_kg_per_ton_compost": [7.1, 4.1, 5.4, 16.6],
+      "CO2_emission_g_per_kg_fertilizer": [2404.0, 448.0, 443.0, 21.2974],
+      "CH4_emission_g_per_kg_fertilizer": [0.45, 0.018, 0.02, 0.0033768],
+      "N2O_emission_g_per_kg_fertilizer": [9.63, 0.031, 0.009, 0.06854816],
+      "BC_emission_g_per_kg_fertilizer": [0.549, 0.004, 0.07, 0.00429233],
+      "CO2_eq_kg_per_kg_fertilizer": [5.66, 1.36, 1.23, null],
+      "energy_requirement_MJ_per_kg_fertilizer": [23.45, 0.18, 3.0,null]
+      }
+  }
+

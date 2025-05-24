@@ -1,0 +1,115 @@
+{
+    "fuel_data": {
+        "Fuel Type": ["LPG", "Gasoline", "Kerosene", "Diesel", "Natural Gas", "Coal"],
+        "Energy Content (MJ/L)": [25.069, 35.44, 35.28, 36.372, 0.0333, 23.86],
+        "CO2 Emission Factor (kg/MJ)": [0.0631, 0.0693, 0.0719, 0.0741, 0.0561, 0.0983],
+        "CH4 Emission Factor (kg/MJ)": [0.000003, 0.000003, 0.000003, 0.000003, 0.0000003, 0.000001],
+        "N2O Emission Factor (kg/MJ)": [0.0000006, 0.0000006, 0.0000006, 0.0000006, 0.0000001, 0.0000015],
+        "BC Emission Factor (kg/MJ)": [0.0000234, 0.0000234, 0.0000234, 0.0000234, 0.00000005, 0.00001408],
+        "Fuel Density (kg/L)": [0.51, 0.8, 0.8, 0.84, 0.00074, 1]
+    },
+    "electricity_grid_factor": {
+        "CO2 kg-eq/kWh": 0.896515846
+    },
+    "incineration_emissions": {
+        "continuous-stoker": {
+            "CH4 emissions (kg/tonne of wet waste)": 0.0002,
+            "N2O emissions (kg/tonne of wet waste)": 0.047,
+            "BC emissions (kg/tonne of wet waste)": 0.322
+        },
+        "continuous-fluidised bed": {
+            "CH4 emissions (kg/tonne of wet waste)": 0,
+            "N2O emissions (kg/tonne of wet waste)": 0.067,
+            "BC emissions (kg/tonne of wet waste)": 0.322
+        },
+        "semi-continuous-stoker": {
+            "CH4 emissions (kg/tonne of wet waste)": 0.006,
+            "N2O emissions (kg/tonne of wet waste)": 0.041,
+            "BC emissions (kg/tonne of wet waste)": 0.322
+        },
+        "semi-continuous-fluidised bed": {
+            "CH4 emissions (kg/tonne of wet waste)": 0.188,
+            "N2O emissions (kg/tonne of wet waste)": 0.068,
+            "BC emissions (kg/tonne of wet waste)": 0.322
+        }
+    },
+    "fossil_based_co2_emissions": {
+        "Food waste": {
+            "Dry matter content (%)": 40,
+            "Total carbon content (%)": 38,
+            "Fossil carbon fraction (%)": 0,
+            "Oxidation factor (%)": 100,
+            "Mixed Waste Composition (%)": 23.73
+        },
+        "Garden waste": {
+            "Dry matter content (%)": 40,
+            "Total carbon content (%)": 49,
+            "Fossil carbon fraction (%)": 0,
+            "Oxidation factor (%)": 100,
+            "Mixed Waste Composition (%)": 0.00
+        },
+        "Plastics": {
+            "Dry matter content (%)": 100,
+            "Total carbon content (%)": 75,
+            "Fossil carbon fraction (%)": 100,
+            "Oxidation factor (%)": 100,
+            "Mixed Waste Composition (%)": 0.00
+        },
+        "Paper": {
+            "Dry matter content (%)": 90,
+            "Total carbon content (%)": 46,
+            "Fossil carbon fraction (%)": 1,
+            "Oxidation factor (%)": 100,
+            "Mixed Waste Composition (%)": 0.00
+        },
+        "Textile": {
+            "Dry matter content (%)": 80,
+            "Total carbon content (%)": 50,
+            "Fossil carbon fraction (%)": 20,
+            "Oxidation factor (%)": 100,
+            "Mixed Waste Composition (%)": 5.76
+        },
+        "Leather/rubber": {
+            "Dry matter content (%)": 84,
+            "Total carbon content (%)": 67,
+            "Fossil carbon fraction (%)": 20,
+            "Oxidation factor (%)": 100,
+            "Mixed Waste Composition (%)": 1.84
+        },
+        "Glass": {
+            "Dry matter content (%)": 100,
+            "Total carbon content (%)": 0,
+            "Fossil carbon fraction (%)": 0,
+            "Oxidation factor (%)": 0,
+            "Mixed Waste Composition (%)": 0.00
+        },
+        "Metal (aluminium + steel)": {
+            "Dry matter content (%)": 100,
+            "Total carbon content (%)": 0,
+            "Fossil carbon fraction (%)": 0,
+            "Oxidation factor (%)": 0,
+            "Mixed Waste Composition (%)": 0.00
+        },
+        "Nappies/diapers (disposable)": {
+            "Dry matter content (%)": 40,
+            "Total carbon content (%)": 70,
+            "Fossil carbon fraction (%)": 10,
+            "Oxidation factor (%)": 100,
+            "Mixed Waste Composition (%)": 0.00
+        },
+        "Wood": {
+            "Dry matter content (%)": 85,
+            "Total carbon content (%)": 50,
+            "Fossil carbon fraction (%)": 0,
+            "Oxidation factor (%)": 100,
+            "Mixed Waste Composition (%)": 18.2
+        },
+        "Others": {
+            "Dry matter content (%)": 90,
+            "Total carbon content (%)": 3,
+            "Fossil carbon fraction (%)": 100,
+            "Oxidation factor (%)": 0,
+            "Mixed Waste Composition (%)": 50.46
+        }
+    }
+}
