@@ -17,14 +17,6 @@ from app.middleware.auth import AuthMiddleware
 # ✅ Create app
 app = FastAPI(title="GHG Accounting API")
 
-# ✅ Add CORS middleware FIRST
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # ✅ Add Auth middleware NEXT
 app.add_middleware(
@@ -35,6 +27,16 @@ app.add_middleware(
         "/docs",
     ]
 )
+
+# ✅ Add CORS middleware FIRST
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # ✅ Register routes
 app.include_router(transportation_router, prefix="/api/v1/transportation", tags=["Transportation"])
