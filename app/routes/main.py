@@ -20,7 +20,7 @@ app = FastAPI(title="GHG Accounting API")
 # ✅ Add CORS middleware FIRST
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://calc.greenaadhaar.in"],  # remove "*"
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
