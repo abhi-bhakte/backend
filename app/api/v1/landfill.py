@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.landfill import LandfillRequest, LandfillResponse
+from app.models.results_models.landfill import LandfillRequest, LandfillResponse
 from app.services.landfill import LandfillEmissions
 
 # Create a FastAPI router instance

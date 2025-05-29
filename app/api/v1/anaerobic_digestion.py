@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.anaerobic_digestion import AnaerobicDigestionRequest, AnaerobicDigestionResponse
+from app.models.results_models.anaerobic_digestion import AnaerobicDigestionRequest, AnaerobicDigestionResponse
 from app.services.anaerobic_digestion import AnaerobicDigestionEmissions
 
 # Create a FastAPI router instance

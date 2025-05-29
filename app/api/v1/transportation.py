@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.transportation import TransportationRequest, TransportationResponse
+from app.models.results_models.transportation import TransportationRequest, TransportationResponse
 from app.services.transportation import TransportationEmissions
 
 # Create a FastAPI router instance

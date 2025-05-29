@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.recycling import RecyclingRequest, RecyclingResponse
+from app.models.results_models.recycling import RecyclingRequest, RecyclingResponse
 from app.services.recycling import RecyclingEmissions
 
 # Create a FastAPI router instance

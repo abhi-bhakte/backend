@@ -232,9 +232,8 @@ class CompostingEmissions:
         """
         # Retrieve composting N₂O emission factor (kg N₂O per ton of waste)
         compost_factor = self.data_comp.get("composting_emissions", {})
-        n2o_compost
         
-        _factor = compost_factor["IPCC_default_values"]["N2O_kg_per_ton"]
+        n2o_compost_factor = compost_factor["IPCC_default_values"]["N2O_kg_per_ton"]
         
         # Retrieve Global Warming Potential (GWP) for N₂O
         gwp_factors = self.data_trans.get("gwp_factors", {})

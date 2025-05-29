@@ -1,12 +1,12 @@
 {
     "fuel_data": {
-        "Fuel Type": ["LPG", "Gasoline", "Kerosene", "Diesel", "Natural Gas", "Bio-diesel/ethanol"],
-        "Energy Content (MJ/L)": [25.069, 35.44, 35.28, 36.372, 0.0333, 0],
-        "CO2 Emission Factor (kg/MJ)": [0.0631, 0.0693, 0.0719, 0.0741, 0.0561, 0],
-        "CH4 Emission Factor (kg/MJ)": [0.000062, 0.000033, 0.0000039, 0.0000039, 0.000092, 0.00026],
-        "N2O Emission Factor (kg/MJ)": [0.0000002, 0.0000032, 0.0000039, 0.0000039, 0.000003, 0.000041],
-        "BC Emissions (kg/MJ)": [0.0000234, 0.0000234, 0.0000234, 0.0000234, 0.00000005, null],
-        "Fuel Density (kg/L)": [0.53, 0.8, 0.8, 0.84, 0.00074, null]
+        "Fuel Type": ["LPG", "Gasoline", "Kerosene", "Diesel", "Natural Gas", "Bio-diesel/ethanol","EV"],
+        "Energy Content (MJ/L)": [25.069, 35.44, 35.28, 36.372, 0.0333, 0, 0],
+        "CO2 Emission Factor (kg/MJ)": [0.0631, 0.0693, 0.0719, 0.0741, 0.0561, 0, 0],
+        "CH4 Emission Factor (kg/MJ)": [0.000062, 0.000033, 0.0000039, 0.0000039, 0.000092, 0.00026, 0],
+        "N2O Emission Factor (kg/MJ)": [0.0000002, 0.0000032, 0.0000039, 0.0000039, 0.000003, 0.000041, 0],
+        "BC Emissions (kg/MJ)": [0.0000234, 0.0000234, 0.0000234, 0.0000234, 0.00000005, null, 0],
+        "Fuel Density (kg/L)": [0.53, 0.8, 0.8, 0.84, 0.00074, null, 0]
     },
     "vehicle_emission_factors": {
         "Vehicle Type": ["Both modern and older trucks", "Modern trucks", "Older trucks"],

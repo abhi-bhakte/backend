@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.composting import CompostingRequest, CompostingResponse
+from app.models.results_models.composting import CompostingRequest, CompostingResponse
 from app.services.composting import CompostingEmissions
 
 # Create a FastAPI router instance

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.incineration import IncinerationRequest, IncinerationResponse
+from app.models.results_models.incineration import IncinerationRequest, IncinerationResponse
 from app.services.incineration import IncinerationEmissions
 
 # Create a FastAPI router instance
