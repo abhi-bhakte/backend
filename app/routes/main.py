@@ -15,9 +15,19 @@ from app.middleware.auth import AuthMiddleware
 
 
 def register_routes(app: FastAPI):
+
+
+    # Add CORS middleware (first to ensure it applies to all routes)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Allow all origins (you can restrict this to specific domains)
+        allow_credentials=True,
+        allow_methods=["*"],  # Allow all HTTP methods
+        allow_headers=["*"],  # Allow all headers
+    )
     
 
-
+    # Add Auth middleware AFTER CORS
     app.add_middleware(
         AuthMiddleware,
         exempt_paths=[
@@ -29,14 +39,7 @@ def register_routes(app: FastAPI):
         ]
     )
 
-    # Add CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],  # Allow all origins (you can restrict this to specific domains)
-        allow_credentials=True,
-        allow_methods=["*"],  # Allow all HTTP methods
-        allow_headers=["*"],  # Allow all headers
-    )
+    
 
     # Include API routes
     app.include_router(transportation_router, prefix="/api/v1/transportation", tags=["Calculation"])
