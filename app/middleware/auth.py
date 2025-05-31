@@ -11,6 +11,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self.exempt_paths = exempt_paths or []
 
     async def dispatch(self, request: Request, call_next: Callable):
+        # Allow all OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
         path = request.url.path
         if path in self.exempt_paths:
             return await call_next(request)

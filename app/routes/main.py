@@ -31,6 +31,7 @@ def register_routes(app: FastAPI):
     app.add_middleware(
         AuthMiddleware,
         exempt_paths=[
+            "/",  # Exempt root path
             "/api/v1/login",
             "/api/v1/register",
             "/docs",

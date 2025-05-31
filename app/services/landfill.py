@@ -181,7 +181,7 @@ class LandfillEmissions:
             "CH4 Emission Factor (kg/MJ)",
             self.waste_disposed,
         )
-        print(f"CH₄ emissions from fuel combustion: {ch4_fuel_combustion} kg CO₂-eq")
+
         return ch4_fuel_combustion
 
     def ch4_avoid_landfill(self):
@@ -191,7 +191,7 @@ class LandfillEmissions:
         Returns:
             float: Avoided CH₄ emissions (to be implemented).
         """
-        pass
+        return 0.0  # Placeholder for avoided CH₄ emissions calculation
 
     def co2_emit_landfill(self) -> float:
         """
@@ -206,7 +206,6 @@ class LandfillEmissions:
         amount_deposited = self.waste_disposed * (100 - self.waste_disposed_fired) / 100
 
         total_co2_electricity = self.grid_electricity * co2_per_kwh / amount_deposited
-        print(f"CO₂ emissions from electricity consumption: {total_co2_electricity} kg CO₂-eq")
 
         co2_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_type,
@@ -214,7 +213,6 @@ class LandfillEmissions:
             "CO2 Emission Factor (kg/MJ)",
             self.waste_disposed,
         )
-        print(f"CO₂ emissions from fuel combustion: {co2_fuel_combustion} kg CO₂-eq")
         return co2_fuel_combustion
 
     def co2_avoid_landfill(self):
@@ -224,7 +222,7 @@ class LandfillEmissions:
         Returns:
             float: Avoided CO₂ emissions (to be implemented).
         """
-        pass
+        return 0.0
 
     def n2o_emit_landfill(self) -> float:
         """
@@ -239,7 +237,7 @@ class LandfillEmissions:
             "N2O Emission Factor (kg/MJ)",
             self.waste_disposed,
         )
-        print(f"N₂O emissions from fuel combustion: {n2o_fuel_combustion} kg CO₂-eq")
+
         return n2o_fuel_combustion
 
     def n2o_avoid_landfill(self):
@@ -249,7 +247,7 @@ class LandfillEmissions:
         Returns:
             float: Avoided N₂O emissions (to be implemented).
         """
-        pass
+        return 0.0
 
     def bc_emit_landfill(self) -> float:
         """
@@ -264,7 +262,7 @@ class LandfillEmissions:
             "BC Emission Factor (kg/MJ)",
             self.waste_disposed,
         )
-        print(f"BC emissions from fuel combustion: {bc_fuel_combustion} kg CO₂-eq")
+
         return bc_fuel_combustion
 
     def bc_avoid_landfill(self):
@@ -274,7 +272,7 @@ class LandfillEmissions:
         Returns:
             float: Avoided BC emissions (to be implemented).
         """
-        pass
+        return 0.0  # Placeholder for avoided BC emissions calculation
 
     def overall_emissions(self) -> dict:
         """
