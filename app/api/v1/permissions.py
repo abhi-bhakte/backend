@@ -8,7 +8,7 @@ from bson import ObjectId
 
 router = APIRouter()
 
-ModuleNames = Literal["dashboard","database", "comparison", "guide", "ghg_emissions", "profile"]
+ModuleNames = Literal["dashboard", "database", "repository", "comparison", "guide", "ghg_emissions", "profile", "users"]
 PermissionType = Literal["read", "write", "update", "delete", "audit", "all"]
 
 # --- Schemas ---
