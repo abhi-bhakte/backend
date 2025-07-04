@@ -12,8 +12,8 @@ from .incineration_data import IncinerationData
 from .landfill_data import LandfillData
 
 class WasteComposition(BaseModel):
-    food_waste: float = Field(..., description="Percentage of food waste")
-    garden_waste: float = Field(..., description="Percentage of garden waste")
+    food: float = Field(..., description="Percentage of food waste")
+    garden: float = Field(..., description="Percentage of garden waste")
     plastic: float = Field(..., description="Percentage of plastic waste")
     paper: float = Field(..., description="Percentage of paper waste")
     textile: float = Field(..., description="Percentage of textile waste")

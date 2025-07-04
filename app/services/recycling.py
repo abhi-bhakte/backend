@@ -34,11 +34,12 @@ class RecyclingEmissions:
             raise ValueError("Recyclable collection values cannot be negative.")
         if any(value < 0 for material in electricity_consumed.values() for value in [material]):
             raise ValueError("Electricity consumption values cannot be negative.")
-        if any(value < 0 for material in fuel_consumed_operation.values() for value in [material]):
+        if any(val < 0 for material in fuel_consumed_operation.values() for val in material):
             raise ValueError("Fuel consumption values cannot be negative.")
 
         # Initialize attributes
         self.recycle_collected_formal = recycle_collected_formal
+        print(f"Recycling collected formal: {self.recycle_collected_formal}")
         self.recycle_collected_informal = recycle_collected_informal
         self.material_composition_formal = material_composition_formal
         self.material_composition_informal = material_composition_informal
@@ -170,10 +171,6 @@ class RecyclingEmissions:
         # Combine emissions from both sectors
         total_emissions = total_emissions_formal + total_emissions_informal
 
-        # Log the calculated total emissions
-        print(f"Total emissions (formal sector): {total_emissions_formal}")
-        print(f"Total emissions (informal sector): {total_emissions_informal}")
-        print(f"Combined total emissions: {total_emissions}")
 
         return total_emissions
 

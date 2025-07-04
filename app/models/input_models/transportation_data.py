@@ -6,7 +6,7 @@ class TransportationFuelUse(BaseModel):
     petrol: Optional[float] = Field(0, description="Petrol used (L/day)")
     diesel: Optional[float] = Field(0, description="Diesel used (L/day)")
     cng: Optional[float] = Field(0, description="CNG used (L/day)")
-    electricity: Optional[float] = Field(0, description="Electricity used (kWh/day)")
+    ev: Optional[float] = Field(0, description="Electricity used (kWh/day)")
 
 class TransferStationEnergyUse(BaseModel):
     waste_handled_tpd: float = Field(..., description="Waste handled at transfer station (tonnes/day)")

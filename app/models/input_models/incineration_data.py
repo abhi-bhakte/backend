@@ -6,7 +6,7 @@ from typing import Optional
 
 class IncineratorInfo(BaseModel):
     calorific_value_mj_per_kg: Optional[float] = Field(None, description="Calorific value (LHV) of waste in MJ/kg")
-    incineration_technology: Optional[str] = Field(None, description="Type of incineration technology")
+    incineration_type: Optional[str] = Field(None, description="Type of incineration technology")
 
 
 class IncinerationEnergyUse(BaseModel):

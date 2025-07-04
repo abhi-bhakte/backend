@@ -15,8 +15,8 @@ class LandfillEmissions:
         end_year (int): End year of waste disposal.
         current_year (int): Current year of disposal.
         annual_growth_rate (float): Estimated growth of annual disposal at the landfill (%).
-        fossil_fuel_type (str): Type of fossil fuel used for operation activities.
-        fossil_fuel_consumption (float): Consumption of fossil fuel used for operation activities (liters).
+        fossil_fuel_types (list[str]): Types of fossil fuels used for operation activities.
+        fossil_fuel_consumed (list[float]): Consumption of fossil fuels used for operation activities (liters).
         grid_electricity (float): Grid electricity used for operation activities (kWh).
         gas_collection_efficiency (float): Efficiency of gas collection (%).
         gas_treatment_method (str): Treatment method of collected landfill gas.
@@ -35,8 +35,8 @@ class LandfillEmissions:
         end_year: int,
         current_year: int,
         annual_growth_rate: float,
-        fossil_fuel_type: str,
-        fossil_fuel_consumption: float,
+        fossil_fuel_types: list,
+        fossil_fuel_consumed: list,
         grid_electricity: float,
         gas_collection_efficiency: float = 0.0,
         gas_treatment_method: str = None,
@@ -56,8 +56,8 @@ class LandfillEmissions:
             end_year (int): End year of waste disposal.
             current_year (int): Current year of disposal.
             annual_growth_rate (float): Estimated growth of annual disposal at the landfill (%).
-            fossil_fuel_type (str): Type of fossil fuel used for operation activities.
-            fossil_fuel_consumption (float): Consumption of fossil fuel used for operation activities (liters).
+            fossil_fuel_types (list[str]): Types of fossil fuels used for operation activities.
+            fossil_fuel_consumed (list[float]): Consumption of fossil fuels used for operation activities (liters).
             grid_electricity (float): Grid electricity used for operation activities (kWh).
             gas_collection_efficiency (float): Efficiency of gas collection (%).
             gas_treatment_method (str): Treatment method of collected landfill gas.
@@ -75,13 +75,14 @@ class LandfillEmissions:
             for x in [
                 waste_disposed,
                 annual_growth_rate,
-                fossil_fuel_consumption,
                 grid_electricity,
                 gas_collection_efficiency,
                 lfg_utilization_efficiency,
             ]
         ):
             raise ValueError("Numeric values cannot be negative.")
+        if any(x < 0 for x in fossil_fuel_consumed):
+            raise ValueError("Fossil fuel consumption values cannot be negative.")
         if start_year > end_year or current_year < start_year or current_year > end_year:
             raise ValueError("Invalid year range for disposal or recovery.")
 
@@ -93,8 +94,8 @@ class LandfillEmissions:
         self.end_year = end_year
         self.current_year = current_year
         self.annual_growth_rate = annual_growth_rate
-        self.fossil_fuel_type = fossil_fuel_type
-        self.fossil_fuel_consumption = fossil_fuel_consumption
+        self.fossil_fuel_types = fossil_fuel_types
+        self.fossil_fuel_consumed = fossil_fuel_consumed
         self.grid_electricity = grid_electricity
         self.gas_collection_efficiency = gas_collection_efficiency
         self.gas_treatment_method = gas_treatment_method
@@ -176,8 +177,8 @@ class LandfillEmissions:
             float: CH₄ emissions from fuel combustion.
         """
         ch4_fuel_combustion = self._calculate_emissions(
-            self.fossil_fuel_type,
-            self.fossil_fuel_consumption,
+            self.fossil_fuel_types,
+            self.fossil_fuel_consumed,
             "CH4 Emission Factor (kg/MJ)",
             self.waste_disposed,
         )
@@ -208,8 +209,8 @@ class LandfillEmissions:
         total_co2_electricity = self.grid_electricity * co2_per_kwh / amount_deposited
 
         co2_fuel_combustion = self._calculate_emissions(
-            self.fossil_fuel_type,
-            self.fossil_fuel_consumption,
+            self.fossil_fuel_types,
+            self.fossil_fuel_consumed,
             "CO2 Emission Factor (kg/MJ)",
             self.waste_disposed,
         )
@@ -232,8 +233,8 @@ class LandfillEmissions:
             float: N₂O emissions from fuel combustion.
         """
         n2o_fuel_combustion = self._calculate_emissions(
-            self.fossil_fuel_type,
-            self.fossil_fuel_consumption,
+            self.fossil_fuel_types,
+            self.fossil_fuel_consumed,
             "N2O Emission Factor (kg/MJ)",
             self.waste_disposed,
         )
@@ -257,8 +258,8 @@ class LandfillEmissions:
             float: BC emissions from fuel combustion.
         """
         bc_fuel_combustion = self._calculate_emissions(
-            self.fossil_fuel_type,
-            self.fossil_fuel_consumption,
+            self.fossil_fuel_types,
+            self.fossil_fuel_consumed,
             "BC Emission Factor (kg/MJ)",
             self.waste_disposed,
         )

@@ -68,12 +68,14 @@ class UserResponse(BaseModel):
         email (EmailStr): User e-mail (always lowercase).
         name (str | None): User’s full name.
         roles (List[str]): Roles granted to the user.
+        accessibleCities (List[str]): Cities this user can access.
     """
 
     id: int
     email: EmailStr
     name: Optional[str] = None
     roles: List[str] = Field(default_factory=list)
+    accessibleCities: List[str] = Field(default_factory=list)
 
 
 class LoginResponse(BaseModel):

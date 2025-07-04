@@ -176,6 +176,7 @@ class IncinerationEmissions:
         """
         # Placeholder logic for CH4 emissions avoided
         return 0.0
+    
 
     def co2_emit_incineration(self) -> float:
         """
@@ -204,19 +205,23 @@ class IncinerationEmissions:
             oxidation_factor = properties.get("Oxidation factor (%)", 0)
             mixed_waste_composition = properties.get("Mixed Waste Composition (%)", 0)
 
+
             fossil_carbon_wet_waste = (
                 (dry_matter_content / 100)
                 * (total_carbon_content / 100)
                 * (fossil_carbon_fraction / 100)
                 * (oxidation_factor / 100)
             )
+            
             co2_emission = (
                 1000
                 * fossil_carbon_wet_waste
                 * (mixed_waste_composition / 100)
                 * (44 / 12)
             )
+            
             total_co2_waste_combustion += co2_emission
+
 
         total_co2_emissions = total_co2_electricity + co2_fuel_combustion + total_co2_waste_combustion
         return total_co2_emissions

@@ -14,8 +14,8 @@ class LandfillRequest(BaseModel):
         end_year (int): End year of waste disposal.
         current_year (int): Current year of disposal.
         annual_growth_rate (float): Estimated growth of annual disposal at the landfill (%).
-        fossil_fuel_type (str): Type of fossil fuel used for operation activities.
-        fossil_fuel_consumption (float): Consumption of fossil fuel used for operation activities (liters).
+        fossil_fuel_types (List[str]): Types of fossil fuels used for operation activities.
+        fossil_fuel_consumed (List[float]): Consumption of fossil fuels used for operation activities (liters).
         grid_electricity (float): Grid electricity used for operation activities (kWh).
         gas_collection_efficiency (float): Efficiency of gas collection (%).
         gas_treatment_method (Optional[str]): Treatment method of collected landfill gas.
@@ -32,8 +32,8 @@ class LandfillRequest(BaseModel):
     end_year: int = Field(..., ge=1900, description="End year of waste disposal")
     current_year: int = Field(..., ge=1900, description="Current year of disposal")
     annual_growth_rate: float = Field(..., ge=0, description="Estimated growth of annual disposal at the landfill (%)")
-    fossil_fuel_type: str = Field(..., description="Type of fossil fuel used for operation activities")
-    fossil_fuel_consumption: float = Field(..., ge=0, description="Consumption of fossil fuel used for operation activities (liters)")
+    fossil_fuel_types: List[str] = Field(..., description="Types of fossil fuels used for operation activities")
+    fossil_fuel_consumed: List[float] = Field(..., description="Consumption of fossil fuels used for operation activities (liters)")
     grid_electricity: float = Field(..., ge=0, description="Grid electricity used for operation activities (kWh)")
     gas_collection_efficiency: float = Field(..., ge=0, le=100, description="Efficiency of gas collection (%)")
     gas_treatment_method: Optional[str] = Field(None, description="Treatment method of collected landfill gas")

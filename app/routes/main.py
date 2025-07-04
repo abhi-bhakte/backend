@@ -20,7 +20,11 @@ def register_routes(app: FastAPI):
     # Add CORS middleware (first to ensure it applies to all routes)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["https://calc.greenaadhaar.in"],  # Allow all origins (you can restrict this to specific domains)
+        allow_origins=[
+            "https://calc.greenaadhaar.in",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173"
+        ],  # Allow all relevant origins for local dev and prod
         allow_credentials=True,
         allow_methods=["*"],  # Allow all HTTP methods
         allow_headers=["*"],  # Allow all headers

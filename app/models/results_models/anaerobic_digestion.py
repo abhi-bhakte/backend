@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import List
 
 
@@ -25,6 +25,12 @@ class AnaerobicDigestionRequest(BaseModel):
     electricity_consumed: float = Field(..., ge=0, description="Electricity consumed during anaerobic digestion (kWh)")
     fuel_types_operation: List[str] = Field(..., description="Types of fuel used in anaerobic digestion operations")
     fuel_consumed_operation: List[float] = Field(..., description="Fuel consumption in liters")
+
+    @validator("fuel_replaced")
+    def validate_fuel_replaced(cls, value):
+        if not value.strip():  # Ensure the value is not empty or whitespace
+            raise ValueError("fuel_replaced cannot be empty")
+        return value
 
 
 class AnaerobicDigestionResponse(BaseModel):

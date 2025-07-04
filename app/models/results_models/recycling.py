@@ -12,6 +12,7 @@ class RecyclingRequest(BaseModel):
         material_composition_formal (Dict[str, float]): Composition (%) of materials collected by the formal sector.
         material_composition_informal (Dict[str, float]): Composition (%) of materials collected by the informal sector.
         electricity_consumed (Dict[str, float]): Electricity consumed during recycling for each material (kWh).
+        coal_consumed (Dict[str, float]): Coal consumed during recycling for each material (kg).
         fuel_types_operation (Dict[str, List[str]]): Types of fuel used in recycling operations for each material.
         fuel_consumed_operation (Dict[str, List[float]]): Fuel consumption in liters for each material.
         recyclability (Dict[str, float]): Recyclability of materials (percentage).
@@ -21,6 +22,7 @@ class RecyclingRequest(BaseModel):
     material_composition_formal: Dict[str, float] = Field(..., description="Composition (%) of materials collected by the formal sector")
     material_composition_informal: Dict[str, float] = Field(..., description="Composition (%) of materials collected by the informal sector")
     electricity_consumed: Dict[str, float] = Field(..., description="Electricity consumed during recycling for each material (kWh)")
+    coal_consumed: Dict[str, float] = Field(..., description="Coal consumed during recycling for each material (kg)")
     fuel_types_operation: Dict[str, List[str]] = Field(..., description="Types of fuel used in recycling operations for each material")
     fuel_consumed_operation: Dict[str, List[float]] = Field(..., description="Fuel consumption in liters for each material")
     recyclability: Dict[str, float] = Field(..., description="Recyclability of materials (percentage)")

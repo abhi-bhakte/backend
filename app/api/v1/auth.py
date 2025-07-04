@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Response, Body
+from fastapi import APIRouter, HTTPException, status, Depends, Response, Body, Path
 from pydantic import BaseModel, EmailStr, Field
 from app.db.db import get_db
 from app.utils.auth import (
@@ -9,6 +9,7 @@ from app.utils.auth import (
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List
 from bson import ObjectId
+from fastapi.encoders import jsonable_encoder
 
 router = APIRouter()
 
@@ -33,6 +34,7 @@ class RegisterRequest(BaseModel):
     city: str
     role: str  # superadmin, admin, regular
     permissions: list[str] = []  # modules from frontend
+    accessibleCities: list[str] = []  # NEW: accessible cities from frontend
 
 
 class RegisterResponse(BaseModel):
@@ -49,7 +51,18 @@ class UserOut(BaseModel):
     mobile: str
     city: str
     role: str
+    accessibleCities: list[str] = []  # NEW: accessible cities for user
     # Add other fields as needed, but exclude password/hash
+
+
+class UserUpdateRequest(BaseModel):
+    name: str | None = None
+    email: EmailStr | None = None
+    mobile: str | None = None
+    city: str | None = None
+    role: str | None = None
+    accessibleCities: list[str] | None = None
+    # Add other fields as needed
 
 
 # 🔐 Login Endpoint
@@ -111,7 +124,8 @@ async def register_user(
         "hashed_password": hashed_pw,
         "mobile": request.mobile,
         "city": request.city,
-        "role": request.role
+        "role": request.role,
+        "accessibleCities": request.accessibleCities,  # NEW
     }
 
     # Insert the user
@@ -152,8 +166,32 @@ async def list_users(db: AsyncIOMotorDatabase = Depends(get_db)):
             mobile=user.get("mobile", ""),
             city=user.get("city", ""),
             role=user.get("role", ""),
+            accessibleCities=user.get("accessibleCities", []),  # NEW
         ))
     return users
+
+
+@router.get("/users/{user_id}", response_model=UserOut)
+async def get_user(user_id: str = Path(...), db: AsyncIOMotorDatabase = Depends(get_db)):
+    """
+    Get a single user's info by user_id (for frontend dashboard restriction).
+    """
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
+    user = await db["users"].find_one({"_id": oid})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserOut(
+        id=str(user["_id"]),
+        name=user.get("name", ""),
+        email=user.get("email", ""),
+        mobile=user.get("mobile", ""),
+        city=user.get("city", ""),
+        role=user.get("role", ""),
+        accessibleCities=user.get("accessibleCities", []),
+    )
 
 
 @router.delete("/users/{user_id}")
@@ -190,3 +228,25 @@ async def admin_reset_password(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": "Password reset successfully"}
+
+
+@router.patch("/users/{user_id}")
+async def update_user(
+    user_id: str,
+    update: UserUpdateRequest = Body(...),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    """
+    Update user fields (including accessibleCities) by user_id.
+    """
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
+    update_data = {k: v for k, v in update.dict(exclude_unset=True).items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    result = await db["users"].update_one({"_id": oid}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "User updated successfully"}

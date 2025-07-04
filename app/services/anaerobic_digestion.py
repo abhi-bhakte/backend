@@ -35,6 +35,17 @@ class AnaerobicDigestionEmissions:
         """
         Initialize the Anaerobic Digestion Emissions calculator.
         """
+
+        # Debugging logs to verify received data
+        print(f"Received waste_digested: {waste_digested}")
+        print(f"Received ad_energy_product: {ad_energy_product}")
+        print(f"Received fuel_replaced: {fuel_replaced}")
+        print(f"Received compost_recovered: {compost_recovered}")
+        print(f"Received percent_compost_use_agri_garden: {percent_compost_use_agri_garden}")
+        print(f"Received electricity_consumed: {electricity_consumed}")
+        print(f"Received fuel_types_operation: {fuel_types_operation}")
+        print(f"Received fuel_consumed_operation: {fuel_consumed_operation}")
+
         self.waste_digested = waste_digested
         self.ad_energy_product = ad_energy_product
         self.fuel_replaced = fuel_replaced

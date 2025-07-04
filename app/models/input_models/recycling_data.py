@@ -17,6 +17,7 @@ class MaterialEnergyData(BaseModel):
     petrol_l_per_day: Optional[float] = Field(None, description="Petrol used (L/day)")
     diesel_l_per_day: Optional[float] = Field(None, description="Diesel used (L/day)")
     cng_l_per_day: Optional[float] = Field(None, description="CNG used (L/day)")
+    coal_kg_per_day: Optional[float] = Field(None, description="Coal used (kg/day)")
     recyclability_percent: Optional[float] = Field(None, ge=0, le=100, description="Recyclability (%)")
 
 
