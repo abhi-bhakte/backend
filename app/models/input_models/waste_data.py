@@ -45,13 +45,13 @@ class WasteData(BaseModel):
     informally_collected: float = Field(..., description="Informally collected waste (tonnes/day)")
     uncollected: Optional[float] = Field(None, description="Uncollected waste (auto-calculated if not provided)")
 
-    selected_treatment_methods: List[str] = Field(
+    selected_categories: List[str] = Field(
         ..., 
-        description="List of selected waste treatment methods. Options: composting, anaerobic, recycling, incineration, landfilling"
+        description="List of selected waste categories. Options: composting, anaerobic, recycling, incineration, landfilling"
     )
 
     waste_composition: WasteComposition = Field(..., description="Waste composition as percentage by weight")
-    waste_allocation: WasteAllocation = Field(..., description="Waste allocation for each treatment method (tonnes/day)")
+    waste_allocation: WasteAllocation = Field(..., description="Waste allocation for each category (tonnes/day)")
 
     transportation: Optional[TransportationData] = Field(None, description="Transportation data block")
     composting: Optional[CompostingData] = Field(None, description="Composting data block")

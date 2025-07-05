@@ -10,6 +10,8 @@ from app.api.v1.emissions_database import router as emissions_router
 from app.api.v1.waste_input_api.waste_input import router as waste_input_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.permissions import router as permissions_router
+from app.api.v1.scenario import router as scenario_router
+from app.api.v1.db_database import router as db_router
 from app.middleware.auth import AuthMiddleware
 
 
@@ -57,6 +59,8 @@ def register_routes(app: FastAPI):
     app.include_router(waste_input_router, prefix="/api/v1/waste_data", tags=["Waste Data"])
     app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
     app.include_router(permissions_router, prefix="/api/v1", tags=["Permissions"])
+    app.include_router(scenario_router, prefix="/api/v1/scenario", tags=["Scenario"])
+    app.include_router(db_router, prefix="/api/v1/db_database", tags=["DB Database"])
 
 
 
