@@ -39,6 +39,7 @@ class WasteData(BaseModel):
     scenario_name: Optional[str] = Field(None, description="Scenario name or tag (e.g., Summer2024 Plan)")
 
     city_name: str = Field(..., description="City name")
+    date: str = Field(..., description="Date of waste data entry (YYYY-MM-DD)")
     population: int = Field(..., description="City population")
     total_waste_generation: float = Field(..., description="Total waste generation (tonnes/day)")
     formally_collected: float = Field(..., description="Formally collected waste (tonnes/day)")

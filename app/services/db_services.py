@@ -11,9 +11,11 @@ async def create_db(db_obj: Db, db: AsyncIOMotorDatabase) -> str:
     result = await db.database.insert_one(db_dict)
     return str(result.inserted_id)
 
-async def get_dbs(db: AsyncIOMotorDatabase) -> list:
+async def get_dbs(db: AsyncIOMotorDatabase, query: dict = None) -> list:
     dbs = []
-    cursor = db.database.find({})
+    if query is None:
+        query = {}
+    cursor = db.database.find(query)
     async for doc in cursor:
         doc["_id"] = str(doc["_id"])
         dbs.append(doc)
@@ -30,12 +32,27 @@ async def update_db(db_id: str, db_obj: Db, db: AsyncIOMotorDatabase) -> bool:
     # Remove id and _id fields if present
     update_dict.pop('id', None)
     update_dict.pop('_id', None)
-    result = await db.database.update_one(
-        {"_id": ObjectId(db_id)},
-        {"$set": update_dict}
-    )
+    from bson import ObjectId
+    # Try ObjectId first
+    try:
+        obj_id = ObjectId(db_id)
+        result = await db.database.update_one({"_id": obj_id}, {"$set": update_dict})
+        if result.modified_count == 1:
+            return True
+    except Exception:
+        pass
+    # Try string _id
+    result = await db.database.update_one({"_id": db_id}, {"$set": update_dict})
     return result.modified_count == 1
 
 async def delete_db(db_id: str, db: AsyncIOMotorDatabase) -> bool:
-    result = await db.database.delete_one({"_id": ObjectId(db_id)})
+    from bson import ObjectId
+    try:
+        obj_id = ObjectId(db_id)
+        result = await db.database.delete_one({"_id": obj_id})
+        if result.deleted_count == 1:
+            return True
+    except Exception:
+        pass
+    result = await db.database.delete_one({"_id": db_id})
     return result.deleted_count == 1

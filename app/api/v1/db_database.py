@@ -15,9 +15,16 @@ async def add_db(db: Db, database: AsyncIOMotorDatabase = Depends(get_db)):
     db_id = await create_db(db, database)
     return {"id": db_id, "message": "DB data added successfully"}
 
+from app.utils.dependencies import get_current_user
+
 @router.get("/dbs/", response_model=list)
-async def fetch_dbs(database: AsyncIOMotorDatabase = Depends(get_db)):
-    return await get_dbs(database)
+async def fetch_dbs(database: AsyncIOMotorDatabase = Depends(get_db), current_user=Depends(get_current_user)):
+    role = current_user.get("role")
+    accessible_cities = current_user.get("accessibleCities", [])
+    query = {}
+    if role in ["regular", "admin"]:
+        query = {"city": {"$in": accessible_cities}}
+    return await get_dbs(database, query)
 
 @router.get("/dbs/{db_id}", response_model=dict)
 async def fetch_db(db_id: str, database: AsyncIOMotorDatabase = Depends(get_db)):

@@ -91,7 +91,8 @@ async def login_user(
         "sub": user["email"],
         "name": user["name"],
         "role": user.get("role", ""),
-        "id": str(user["_id"])
+        "id": str(user["_id"]),
+        "accessibleCities": user.get("accessibleCities", [])
     })
     return LoginResponse(
         access_token=access_token,
