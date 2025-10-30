@@ -10,8 +10,8 @@ class CityData(BaseModel):
     treatmentMethods: List[str]
 
 class WasteComposition(BaseModel):
-    foodWaste: float
-    gardenWaste: float
+    food: float
+    garden: float
     plastic: float
     paper: float
     textile: float
@@ -26,6 +26,7 @@ class WasteComposition(BaseModel):
 class Transportation(BaseModel):
     vehicleType: str
     fuelsUsed: List[str]
+    transferStationFuels: List[str] = Field(default_factory=list)
 
 class Composting(BaseModel):
     compostProduction: str
