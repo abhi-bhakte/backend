@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 
-data_file = Path(__file__).parent.parent / "data" / "transportation.json"
+
+DATA_FILE = Path(__file__).parent.parent / "data" / "transportation.json"
 
 
 class TransportationEmissions:
@@ -12,11 +13,11 @@ class TransportationEmissions:
     Attributes:
         waste_formal (float): Waste collected (tons).
         fuel_types_transport (list[str]): Fuel types used in transport.
-        fuel_consumed_transport (list[float]): Fuel consumption in liters.
+        fuel_consumed_transport (list[float]): Fuel consumption values.
         vehicle_type (str): Type of vehicle used.
         waste_transfer_station (bool): Whether a transfer station is used.
         fuel_types_station (list[str]): Fuel types used in the transfer station.
-        fuel_consumed_station (list[float]): Fuel consumption in liters.
+        fuel_consumed_station (list[float]): Fuel consumption values at the station.
         electric_consumed (float): Electricity consumed at the station (kWh).
         waste_handled_at_station (float): Waste handled at the station (tons).
         data (dict): Emission factor data loaded from JSON.
@@ -32,11 +33,11 @@ class TransportationEmissions:
         Args:
             waste_formal (float): Waste collected (tons).
             fuel_types_transport (list[str]): Fuel types used in transport.
-            fuel_consumed_transport (list[float]): Fuel consumption in liters.
+            fuel_consumed_transport (list[float]): Fuel consumption values.
             vehicle_type (str): Type of vehicle used.
             waste_transfer_station (bool): Whether a transfer station is used.
             fuel_types_station (list[str]): Fuel types used in the transfer station.
-            fuel_consumed_station (list[float]): Fuel consumption in liters.
+            fuel_consumed_station (list[float]): Fuel consumption values.
             electric_consumed (float): Electricity consumed at the station (kWh).
             waste_handled_at_station (float): Waste handled at the station (tons).
     
@@ -60,15 +61,46 @@ class TransportationEmissions:
         self.fuel_consumed_station = fuel_consumed_station
         self.electric_consumed = electric_consumed
         self.waste_handled_at_station = waste_handled_at_station
-        self.data_file = data_file
+        self.data_file = DATA_FILE
         
         try:
             with open(self.data_file, "r", encoding="utf-8") as file:
                 self.data = json.load(file)
         except FileNotFoundError:
-            raise FileNotFoundError(f"The file {data_file} was not found.")
+            raise FileNotFoundError(f"The file {DATA_FILE} was not found.")
         except json.JSONDecodeError:
             raise ValueError("Error decoding JSON file. Please check the format.")
+
+    @staticmethod
+    def _normalize_key(text: str) -> str:
+        """Normalize free-text keys to snake_case compatible with JSON keys."""
+        return (
+            (text or "")
+            .strip()
+            .lower()
+            .replace(" ", "_")
+            .replace("-", "_")
+            .replace("/", "_")
+        )
+
+    def _default_units_for_fuels(self, fuel_types):
+        """Return a list of default units for the given fuel types.
+
+        Defaults:
+        - "cng" -> "kg"
+        - "ev"  -> "kWh"
+        - others -> "L"
+        """
+        defaults = []
+        for fuel in fuel_types:
+            f = self._normalize_key(fuel)
+            if f == "cng":
+                defaults.append("kg")
+            elif f == "ev":
+                defaults.append("kWh")
+            else:
+                defaults.append("L")
+        return defaults
     
     def _calculate_emissions(self, fuel_types, fuel_consumed, factor_key, per_waste, vehicle_type=None):
         """
@@ -86,54 +118,101 @@ class TransportationEmissions:
         """
         total_emissions = 0
 
+        # Fetch correct fuel data and vehicle data (normalized JSON expected)
+        fuel_raw = self.data.get("fuel_data", [])
+        vehicle_raw = self.data.get("vehicle_emission_factors", [])
 
+        # Available types from normalized JSON
+        available_fuels = [f.get("fuel_type") for f in fuel_raw]
+        available_vehicles = [v.get("vehicle_type") for v in vehicle_raw]
 
+        # Use hard-coded default units per fuel type
+        units = self._default_units_for_fuels(fuel_types)
 
-        # Fetch correct fuel data and vehicle data
-        fuel_data = self.data.get("fuel_data", {})
-        vehicle_data = self.data.get("vehicle_emission_factors", {})
-
-        available_fuels = fuel_data.get("Fuel Type", [])
-        available_vehicles = vehicle_data.get("Vehicle Type", [])
-
-        for fuel, consumption in zip(fuel_types, fuel_consumed):
-            if fuel in available_fuels:
-                fuel_index = available_fuels.index(fuel)
-                energy_content = fuel_data["Energy Content (MJ/L)"][fuel_index]
+        for fuel, consumption, unit in zip(fuel_types, fuel_consumed, units):
+            f_norm = self._normalize_key(fuel)
+            if f_norm in available_fuels:
+                f_entry = next((x for x in fuel_raw if x.get("fuel_type") == f_norm), None)
+                if f_entry is None:
+                    continue
+                energy_content = f_entry.get("energy_content_mj_per_l", 0)
+                fuel_density = f_entry.get("density_kg_per_l", None)
+                # Normalize consumption to the expected basis for each factor
+                # When using vehicle-specific BC factor (kg/kg fuel), work with mass (kg)
+                # Otherwise, convert to liters to multiply by energy content (MJ/L)
+                
+                # Special handling for EV: consumption measured in kWh, emissions via grid factor
+                if f_norm == "ev":
+                    unit_l = unit.lower()
+                    if unit_l not in ("kwh", "kwh/day", "kwhd"):
+                        # If unit not provided or not kWh, assume the number is already kWh (backward compatible)
+                        # but warn by raising if clearly incompatible units like L or kg are specified
+                        if unit_l.startswith("l") or unit_l.startswith("kg"):
+                            raise ValueError("EV consumption should be provided in kWh. Use unit 'kWh'.")
+                    # Only CO2 is considered from electricity using grid factor
+                    if factor_key == "co2_kg_per_mj":
+                        grid_factor = self.data.get("electricity_grid_factor", {}).get(
+                            "co2_kg_per_kwh", 0
+                        )
+                        total_emissions += consumption * grid_factor
+                    else:
+                        total_emissions += 0
+                    continue
                 
                 # Check if vehicle type is provided and exists in the dataset
-                if vehicle_type and vehicle_type in available_vehicles:
-                    vehicle_index = available_vehicles.index(vehicle_type)
-                    emission_factor = vehicle_data[factor_key][vehicle_index]
-                    fuel_density = fuel_data["Fuel Density (kg/L)"][fuel_index]
-                    total_emissions += (consumption * fuel_density * emission_factor)
+                v_type_norm = self._normalize_key(vehicle_type) if vehicle_type else None
+                if v_type_norm and v_type_norm in available_vehicles:
+                    # Vehicle-specific factor (only BC kg/kg fuel supported)
+                    v_entry = next((v for v in vehicle_raw if v.get("vehicle_type") == v_type_norm), None)
+                    emission_factor = v_entry.get(factor_key, 0) if v_entry else 0
+                    # Determine fuel mass in kg
+                    if unit.lower().startswith("kg"):
+                        fuel_mass_kg = consumption
+                    else:
+                        # unit liters -> convert to kg via density
+                        if fuel_density is None:
+                            raise ValueError(f"Missing fuel density for {fuel} to convert liters to kg.")
+                        fuel_mass_kg = consumption * fuel_density
+                    total_emissions += (fuel_mass_kg * emission_factor)
                 else:
-                    emission_factor = fuel_data[factor_key][fuel_index]
-                    total_emissions += (consumption * energy_content * emission_factor)
+                    emission_factor = f_entry.get("emission_factors", {}).get(factor_key, 0)
+                    # Working on energy basis: MJ/L times liters
+                    if unit.lower().startswith("kg"):
+                        # Convert kg to liters using density
+                        if fuel_density is None or fuel_density == 0:
+                            raise ValueError(f"Missing or zero fuel density for {fuel} to convert kg to liters.")
+                        consumption_liters = consumption / fuel_density
+                    else:
+                        consumption_liters = consumption
+                    total_emissions += (consumption_liters * energy_content * emission_factor)
 
         
         return total_emissions / per_waste if per_waste > 0 else 0
     
-    def ch4_emit_collection(self):
-        """Calculate CH₄ emissions (kgeCO2) per ton of waste collected."""
+    def _gwp100(self, key: str):
+        """Return GWP100 using the exact JSON key (no mapping)."""
+        gwp = self.data.get("gwp_factors", {})
+        return gwp.get(key, {}).get("gwp100", 0)
 
-        gwp_factors=self.data.get("gwp_factors", {})
-        # Get methane GWP values
-        methane_index = gwp_factors["Type of gas"].index("CH4-fossil")  # Get index of CH4-fossil
-        gwp_100_methane = gwp_factors["GWP100"][methane_index]  # Get 100-year GWP
+    def ch4_emit_collection(self):
+        """Calculate CH₄ emissions (kgCO₂e) per ton of waste collected."""
+
+        gwp_100_methane = self._gwp100("ch4_fossil")
 
         return (
-            gwp_100_methane * (
+            gwp_100_methane
+            * (
                 self._calculate_emissions(
-                    self.fuel_types_transport, 
-                    self.fuel_consumed_transport, 
-                    "CH4 Emission Factor (kg/MJ)", 
-                    self.waste_formal
-                ) + self._calculate_emissions(
-                    self.fuel_types_station, 
-                    self.fuel_consumed_station, 
-                    "CH4 Emission Factor (kg/MJ)", 
-                    self.waste_handled_at_station
+                    self.fuel_types_transport,
+                    self.fuel_consumed_transport,
+                    "ch4_kg_per_mj",
+                    self.waste_formal,
+                )
+                + self._calculate_emissions(
+                    self.fuel_types_station,
+                    self.fuel_consumed_station,
+                    "ch4_kg_per_mj",
+                    self.waste_handled_at_station,
                 )
             )
         )
@@ -141,11 +220,7 @@ class TransportationEmissions:
     def bc_emit_collection(self):
         """Calculate BC emissions per ton of waste collected based on vehicle type."""
 
-        gwp_factors=self.data.get("gwp_factors", {})
-
-        # Get black carbon GWP values
-        black_index = gwp_factors["Type of gas"].index("BC")    
-        gwp_100_black = gwp_factors["GWP100"][black_index]
+        gwp_100_black = self._gwp100("bc")
 
 
         return (
@@ -153,14 +228,15 @@ class TransportationEmissions:
                 self._calculate_emissions(
                     self.fuel_types_transport,
                     self.fuel_consumed_transport,
-                    "BC Emission Factor (kg/kg fuel)",
+                    "bc_kg_per_kg_fuel",
                     self.waste_formal,
-                    self.vehicle_type
-                ) + self._calculate_emissions(
+                    self.vehicle_type,
+                )
+                + self._calculate_emissions(
                     self.fuel_types_station,
                     self.fuel_consumed_station,
-                    "BC Emissions (kg/MJ)",
-                    self.waste_handled_at_station
+                    "bc_kg_per_mj",
+                    self.waste_handled_at_station,
                 )
             )
         )
@@ -168,31 +244,27 @@ class TransportationEmissions:
     def n2o_emit_collection(self):
         """Calculate N₂O emissions per ton of waste collected."""
 
-        gwp_factors=self.data.get("gwp_factors", {})
-
-        # Get nitrous oxide GWP values
-        nitrous_index = gwp_factors["Type of gas"].index("N2O")
-        gwp_100_nitrous = gwp_factors["GWP100"][nitrous_index]
+        gwp_100_nitrous = self._gwp100("n2o")
 
         return (
-            gwp_100_nitrous * (
+            gwp_100_nitrous
+            * (
                 self._calculate_emissions(
-                    self.fuel_types_transport, 
-                    self.fuel_consumed_transport, 
-                    "N2O Emission Factor (kg/MJ)", 
-                    self.waste_formal
-                    ) + 
-                    self._calculate_emissions(
-                    self.fuel_types_station, 
-                    self.fuel_consumed_station, 
-                    "N2O Emission Factor (kg/MJ)", 
-                    self.waste_handled_at_station
+                    self.fuel_types_transport,
+                    self.fuel_consumed_transport,
+                    "n2o_kg_per_mj",
+                    self.waste_formal,
+                )
+                + self._calculate_emissions(
+                    self.fuel_types_station,
+                    self.fuel_consumed_station,
+                    "n2o_kg_per_mj",
+                    self.waste_handled_at_station,
                 )
             )
         )
     
     def co2_emit_collection(self):
-
         """
         Calculate CO₂ emissions from:
         1. Collection fuel (transport vehicles).
@@ -205,21 +277,21 @@ class TransportationEmissions:
         co2_transport = self._calculate_emissions(
             self.fuel_types_transport,
             self.fuel_consumed_transport,
-            "CO2 Emission Factor (kg/MJ)",
+            "co2_kg_per_mj",
             self.waste_formal,
         )
 
         co2_station = self._calculate_emissions(
             self.fuel_types_station,
             self.fuel_consumed_station,
-            "CO2 Emission Factor (kg/MJ)",
+            "co2_kg_per_mj",
             self.waste_handled_at_station,
         )
 
         # Calculate CO2 emissions from electricity consumption
         grid_emission_factor = self.data.get("electricity_grid_factor", {})
         total_co2_electricity = self.electric_consumed * grid_emission_factor.get(
-            "CO2 kg-eq/kWh", 0
+            "co2_kg_per_kwh", 0
         )
 
         co2_grid = (
@@ -234,7 +306,6 @@ class TransportationEmissions:
     def overall_emissions(self):
         """Calculate total emissions (CH₄, BC, N₂O, CO₂) per ton of waste collected."""
 
-
         # Calculate emissions for different gases
         ch4 = self.ch4_emit_collection()
         co2 = self.co2_emit_collection()
@@ -248,5 +319,5 @@ class TransportationEmissions:
             "bc_emissions": bc,
             "total_emissions": ch4 + co2 + n2o + bc,
             "total_emissions_avoid": 0,
-            "net_emissions": ch4 + co2 + n2o + bc
+            "net_emissions": ch4 + co2 + n2o + bc,
         }

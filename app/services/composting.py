@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from .transportation import TransportationEmissions
 
 trans_file = Path(__file__).parent.parent / "data" / "transportation.json"
 comp_file = Path(__file__).parent.parent / "data" / "composting.json"
@@ -80,6 +79,21 @@ class CompostingEmissions:
             raise ValueError("Error decoding JSON file. Please check the format.")
 
 
+    @staticmethod
+    def _normalize_key(text: str) -> str:
+        return (
+            (text or "")
+            .strip()
+            .lower()
+            .replace(" ", "_")
+            .replace("-", "_")
+            .replace("/", "_")
+        )
+
+    def _gwp100(self, key: str) -> float:
+        """Return GWP100 using the exact JSON key from transportation data."""
+        gwp = self.data_trans.get("gwp_factors", {})
+        return gwp.get(key, {}).get("gwp100", 0)
 
     def _calculate_emissions(self, fuel_types, fuel_consumed, factor_key, per_waste):
         """
@@ -96,18 +110,19 @@ class CompostingEmissions:
         """
         total_emissions = 0
 
-        # Retrieve fuel data from the dataset
-        fuel_data = self.data_comp.get("fuel_data", {})
-        available_fuels = fuel_data.get("Fuel Type", [])
+        # Retrieve fuel data from the dataset (normalized JSON expected)
+        fuel_raw = self.data_comp.get("fuel_data", [])
+        available_fuels = [f.get("fuel_type") for f in fuel_raw]
 
         # Iterate through each fuel type and compute emissions
         for fuel, consumption in zip(fuel_types, fuel_consumed):
-            if fuel in available_fuels:
-                fuel_index = available_fuels.index(fuel)
-                energy_content = fuel_data["Energy Content (MJ/L)"][fuel_index]
-                emission_factor = fuel_data[factor_key][fuel_index]
-                
-                # Calculate emissions based on energy content and emission factor
+            f_norm = self._normalize_key(fuel)
+            if f_norm in available_fuels:
+                f_entry = next((x for x in fuel_raw if x.get("fuel_type") == f_norm), None)
+                if not f_entry:
+                    continue
+                energy_content = f_entry.get("energy_content_mj_per_l", 0)
+                emission_factor = f_entry.get("emission_factors", {}).get(factor_key, 0)
                 total_emissions += consumption * energy_content * emission_factor
 
         # Normalize emissions by waste amount, avoiding division by zero
@@ -122,25 +137,18 @@ class CompostingEmissions:
         """
         # Retrieve CH₄ emission factor for biogenic degradation
         compost_factor = self.data_comp.get("composting_emissions", {})
-        bio_compost_factor = compost_factor["IPCC_default_values"]["CH4_kg_per_ton"]
+        bio_compost_factor = compost_factor.get("ipcc_default_values", {}).get("ch4_kg_per_ton", 0)
 
-        # Retrieve GWP values
-        gwp_factors = self.data_trans.get("gwp_factors", {})
-
-        # Get index and value for CH₄-fossil GWP
-        methane_fossil_index = gwp_factors["Type of gas"].index("CH4-fossil")
-        gwp_100_fossil = gwp_factors["GWP100"][methane_fossil_index]
-        
-        # Get index and value for CH₄-biogenic GWP
-        methane_bio_index = gwp_factors["Type of gas"].index("CH4-biogenic")
-        gwp_100_biogenic = gwp_factors["GWP100"][methane_bio_index]
+        # Retrieve GWP values (normalized)
+        gwp_100_fossil = self._gwp100("ch4_fossil")
+        gwp_100_biogenic = self._gwp100("ch4_biogenic")
 
         return (
             gwp_100_fossil
             * self._calculate_emissions(
                 self.fuel_types_operation,
                 self.fuel_consumed_operation,
-                "CH4 Emission Factor (kg/MJ)",
+                "ch4_kg_per_mj",
                 self.waste_composted,
             )
             + gwp_100_biogenic * bio_compost_factor
@@ -153,19 +161,13 @@ class CompostingEmissions:
         Returns:
             float: CH₄ emissions avoided in kg CO₂-eq per ton of waste.
         """
-        # Retrieve fertilizer production emission factor
-        ferti_factors = self.data_comp.get("fertilizer_production_emissions", {})
+        # Retrieve fertilizer production emission factor (total)
+        ferti_list = self.data_comp.get("fertilizer_production_emissions", [])
+        total_entry = next((x for x in ferti_list if x.get("fertilizer_type") == "total"), {})
+        ferti_ch4_factor = total_entry.get("ch4_emission_g_per_kg", 0)
 
-        # Get index and value for total CH₄ emissions from fertilizer production
-        total_ch4_index = ferti_factors["fertilizer_types"].index("Total")
-        ferti_ch4_factor = ferti_factors["CH4_emission_g_per_kg_fertilizer"][total_ch4_index]
-
-        # Retrieve methane GWP values
-        gwp_factors = self.data_trans.get("gwp_factors", {})
-
-        # Get index and value for CH₄-fossil GWP
-        methane_fossil_index = gwp_factors["Type of gas"].index("CH4-fossil")
-        gwp_100_fossil = gwp_factors["GWP100"][methane_fossil_index]
+        # Retrieve methane GWP values (fossil)
+        gwp_100_fossil = self._gwp100("ch4_fossil")
 
         return (
             gwp_100_fossil
@@ -187,7 +189,7 @@ class CompostingEmissions:
         """
         # Retrieve electricity grid emission factor (kg CO₂-eq per kWh)
         grid_emission_factor = self.data_trans.get("electricity_grid_factor", {})
-        co2_per_kwh = grid_emission_factor.get("CO2 kg-eq/kWh", 0)
+        co2_per_kwh = grid_emission_factor.get("co2_kg_per_kwh", 0)
         
         # Calculate CO₂ emissions from electricity consumption
         total_co2_electricity = self.electricity_consumed * co2_per_kwh
@@ -196,7 +198,7 @@ class CompostingEmissions:
         co2_from_fuel = self._calculate_emissions(
             self.fuel_types_operation,
             self.fuel_consumed_operation,
-            "CO2 Emission Factor (kg/MJ)",
+            "co2_kg_per_mj",
             self.waste_composted
         )
         
@@ -209,12 +211,10 @@ class CompostingEmissions:
         Returns:
             float: Avoided CO₂ emissions per ton of waste composted (kg CO₂-eq/ton).
         """
-        # Retrieve fertilizer production emission factors
-        ferti_factors = self.data_comp.get("fertilizer_production_emissions", {})
-        
-        # Get the emission factor for total fertilizer production (g CO₂ per kg fertilizer)
-        total_co2_index = ferti_factors["fertilizer_types"].index("Total")
-        ferti_co2_factor = ferti_factors["CO2_emission_g_per_kg_fertilizer"][total_co2_index]
+        # Retrieve fertilizer production emission factors (total)
+        ferti_list = self.data_comp.get("fertilizer_production_emissions", [])
+        total_entry = next((x for x in ferti_list if x.get("fertilizer_type") == "total"), {})
+        ferti_co2_factor = total_entry.get("co2_emission_g_per_kg", 0)
         
         # Convert grams to kilograms (1 g = 0.001 kg) and calculate avoided emissions
         return (
@@ -232,19 +232,16 @@ class CompostingEmissions:
         """
         # Retrieve composting N₂O emission factor (kg N₂O per ton of waste)
         compost_factor = self.data_comp.get("composting_emissions", {})
-        
-        n2o_compost_factor = compost_factor["IPCC_default_values"]["N2O_kg_per_ton"]
+        n2o_compost_factor = compost_factor.get("ipcc_default_values", {}).get("n2o_kg_per_ton", 0)
         
         # Retrieve Global Warming Potential (GWP) for N₂O
-        gwp_factors = self.data_trans.get("gwp_factors", {})
-        n2o_index = gwp_factors["Type of gas"].index("N2O")
-        gwp_100_n2o = gwp_factors["GWP100"][n2o_index]
+        gwp_100_n2o = self._gwp100("n2o")
         
         # Calculate N₂O emissions from fuel combustion and composting process
         n2o_from_fuel = self._calculate_emissions(
             self.fuel_types_operation,
             self.fuel_consumed_operation,
-            "N2O Emission Factor (kg/MJ)",
+            "n2o_kg_per_mj",
             self.waste_composted,
         )
         
@@ -257,15 +254,13 @@ class CompostingEmissions:
         Returns:
             float: Avoided N₂O emissions per ton of waste composted (kg CO₂-eq/ton).
         """
-        # Retrieve fertilizer production N₂O emission factors (g N₂O per kg fertilizer)
-        ferti_factors = self.data_comp.get("fertilizer_production_emissions", {})
-        total_n2o_index = ferti_factors["fertilizer_types"].index("Total")
-        ferti_n2o_factor = ferti_factors["N2O_emission_g_per_kg_fertilizer"][total_n2o_index]
+        # Retrieve fertilizer production N₂O emission factors (total)
+        ferti_list = self.data_comp.get("fertilizer_production_emissions", [])
+        total_entry = next((x for x in ferti_list if x.get("fertilizer_type") == "total"), {})
+        ferti_n2o_factor = total_entry.get("n2o_emission_g_per_kg", 0)
         
         # Retrieve Global Warming Potential (GWP) for N₂O
-        gwp_factors = self.data_trans.get("gwp_factors", {})
-        n2o_index = gwp_factors["Type of gas"].index("N2O")
-        gwp_100_n2o = gwp_factors["GWP100"][n2o_index]
+        gwp_100_n2o = self._gwp100("n2o")
         
         # Convert grams to kilograms and calculate avoided emissions
         return (
@@ -279,21 +274,14 @@ class CompostingEmissions:
         """
         Calculate black carbon (BC) emissions in kgCO2-equivalent per ton of waste treated.
         """
-        # Retrieve GWP (Global Warming Potential) factors
-        gwp_factors = self.data_trans.get("gwp_factors", {})
-        
-        # Get the index for BC in the GWP factors list
-        bc_index = gwp_factors["Type of gas"].index("BC")
-        
-        # Retrieve the 100-year GWP value for BC
-        gwp_100_bc = gwp_factors["GWP100"][bc_index]
+        # Retrieve GWP (Global Warming Potential) factor for BC
+        gwp_100_bc = self._gwp100("bc")
         
         return (
-            gwp_100_bc
-            * self._calculate_emissions(
+            self._calculate_emissions(
                 self.fuel_types_operation,
                 self.fuel_consumed_operation,
-                "BC Emissions (kg/MJ)",
+                "bc_kg_per_mj",
                 self.waste_composted
             )
         )
@@ -302,31 +290,18 @@ class CompostingEmissions:
         """
         Calculate black carbon (BC) avoided emissions per ton of waste composted.
         """
-        # Retrieve fertilizer production emission factors
-        ferti_factors = self.data_comp.get("fertilizer_production_emissions", {})
-        
-        # Get the index for 'Total' fertilizer type in the emissions data
-        total_bc_index = ferti_factors["fertilizer_types"].index("Total")
-        
-        # Retrieve the BC emission factor for fertilizer production (g per kg of fertilizer)
-        ferti_bc_factor = ferti_factors["BC_emission_g_per_kg_fertilizer"][total_bc_index]
+        # Retrieve fertilizer production emission factors (total)
+        ferti_list = self.data_comp.get("fertilizer_production_emissions", [])
+        total_entry = next((x for x in ferti_list if x.get("fertilizer_type") == "total"), {})
+        ferti_bc_factor = total_entry.get("bc_emission_g_per_kg", 0)
         
         # Retrieve GWP factors for BC
-        gwp_factors = self.data_trans.get("gwp_factors", {})
-        
-        # Get the index for BC in the GWP factors list
-        bc_index = gwp_factors["Type of gas"].index("BC")
-        
-        # Retrieve the 100-year GWP value for BC
-        gwp_100_bc = gwp_factors["GWP100"][bc_index]
+        gwp_100_bc = self._gwp100("bc")
         
         return (
-            gwp_100_bc
-            * (
-                (self.compost_prod_potential / 1000)
-                * (self.percent_compost_use_agri_garden / 100)
-                * ferti_bc_factor
-            )
+            (self.compost_prod_potential / 1000)
+            * (self.percent_compost_use_agri_garden / 100)
+            * ferti_bc_factor
         )
 
     def overall_emissions(self):
