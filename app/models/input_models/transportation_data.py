@@ -5,7 +5,7 @@ from typing import Optional
 class TransportationFuelUse(BaseModel):
     petrol: Optional[float] = Field(0, description="Petrol used (L/day)")
     diesel: Optional[float] = Field(0, description="Diesel used (L/day)")
-    cng: Optional[float] = Field(0, description="CNG used (L/day)")
+    cng: Optional[float] = Field(0, description="CNG used (kg/day)")
     ev: Optional[float] = Field(0, description="Electricity used (kWh/day)")
 
 class TransferStationEnergyUse(BaseModel):

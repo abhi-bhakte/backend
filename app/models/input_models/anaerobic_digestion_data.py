@@ -9,14 +9,10 @@ class ADFuelConsumption(BaseModel):
     cng: Optional[float] = Field(None, description="CNG used for AD operations (L/day)")
 
 class ADEnergyProduction(BaseModel):
-    biogas_as_energy: bool = Field(..., description="Is biogas used as a direct energy source?")
+    ad_energy_product: Optional[str] = Field(None,description="Product from AD: 'electricity', 'heat', or 'biogas'" )
+    fuel_replaced: Optional[str] = Field(None,description="Fossil fuel replaced when energy product displaces conventional fuel")
     compost_recovered: bool = Field(..., description="Is compost recovered from AD?")
-    compost_recovery_percent: Optional[float] = Field(
-        None,
-        ge=0,
-        le=100,
-        description="Percentage of compost recovered (0-100%)"
-    )
+    compost_recovery_percent: Optional[float] = Field(None,ge=0,le=100,description="Percentage of compost recovered (0-100%)")
 
 class AnaerobicDigestionData(BaseModel):
     electricity_kwh_per_day: float = Field(..., description="Electricity used for AD operations (kWh/day)")
