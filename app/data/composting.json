@@ -1,28 +1,108 @@
 {
-  "composting_emissions": {
-      "IPCC_default_values": {
-          "CH4_kg_per_ton": 4,
-          "N2O_kg_per_ton": 0.3
-      }
-  },
-  "fuel_data": {
-        "Fuel Type": ["lpg", "petrol", "kerosene", "diesel", "cng"],
-        "Energy Content (MJ/L)": [25.07, 35.44, 35.28, 36.37, 0.03],
-        "CO2 Emission Factor (kg/MJ)": [0.0631, 0.0693, 0.0716, 0.0741, 0.056],
-        "CH4 Emission Factor (kg/MJ)": [0.000003, 0.000003, 0.000003, 0.000003, 0.0000003],
-        "N2O Emission Factor (kg/MJ)": [0.0000006, 0.0000006, 0.0000006, 0.0000006, 0.0000001],
-        "BC Emissions (kg/MJ)": [0.0000234, 0.0000234, 0.0000234, 0.0000234, 0.00000005],
-        "Fuel Density (kg/L)": [0.53, 0.8, 0.8, 0.84, 0.00074]
+    "composting_emissions": {
+        "ipcc_default_values": {
+            "ch4_kg_per_ton": 4,
+            "n2o_kg_per_ton": 0.3
+        }
     },
-  "fertilizer_production_emissions": {
-      "fertilizer_types": ["N fertilizer", "P2O5", "K2O", "Total"],
-      "ferti_replaced_kg_per_ton_compost": [7.1, 4.1, 5.4, 16.6],
-      "CO2_emission_g_per_kg_fertilizer": [2404.0, 448.0, 443.0, 21.2974],
-      "CH4_emission_g_per_kg_fertilizer": [0.45, 0.018, 0.02, 0.0033768],
-      "N2O_emission_g_per_kg_fertilizer": [9.63, 0.031, 0.009, 0.06854816],
-      "BC_emission_g_per_kg_fertilizer": [0.549, 0.004, 0.07, 0.00429233],
-      "CO2_eq_kg_per_kg_fertilizer": [5.66, 1.36, 1.23, null],
-      "energy_requirement_MJ_per_kg_fertilizer": [23.45, 0.18, 3.0,null]
-      }
-  }
+    "fuel_data": [
+        {
+            "fuel_type": "lpg",
+            "energy_content_mj_per_l": 25.07,
+            "density_kg_per_l": 0.53,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0631,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "petrol",
+            "energy_content_mj_per_l": 35.44,
+            "density_kg_per_l": 0.8,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0693,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "kerosene",
+            "energy_content_mj_per_l": 35.28,
+            "density_kg_per_l": 0.8,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0716,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "diesel",
+            "energy_content_mj_per_l": 36.37,
+            "density_kg_per_l": 0.84,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0741,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "cng",
+            "energy_content_mj_per_l": 0.03,
+            "density_kg_per_l": 0.00074,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.056,
+                "ch4_kg_per_mj": 0.0000003,
+                "n2o_kg_per_mj": 0.0000001,
+                "bc_kg_per_mj": 0.00000005
+            }
+        }
+    ],
+    "fertilizer_production_emissions": [
+        {
+            "fertilizer_type": "n_fertilizer",
+            "ferti_replaced_kg_per_ton_compost": 7.1,
+            "co2_emission_g_per_kg": 2404.0,
+            "ch4_emission_g_per_kg": 0.45,
+            "n2o_emission_g_per_kg": 9.63,
+            "bc_emission_g_per_kg": 0.549,
+            "co2_eq_kg_per_kg": 5.66,
+            "energy_requirement_mj_per_kg": 23.45
+        },
+        {
+            "fertilizer_type": "p2o5",
+            "ferti_replaced_kg_per_ton_compost": 4.1,
+            "co2_emission_g_per_kg": 448.0,
+            "ch4_emission_g_per_kg": 0.018,
+            "n2o_emission_g_per_kg": 0.031,
+            "bc_emission_g_per_kg": 0.004,
+            "co2_eq_kg_per_kg": 1.36,
+            "energy_requirement_mj_per_kg": 0.18
+        },
+        {
+            "fertilizer_type": "k2o",
+            "ferti_replaced_kg_per_ton_compost": 5.4,
+            "co2_emission_g_per_kg": 443.0,
+            "ch4_emission_g_per_kg": 0.02,
+            "n2o_emission_g_per_kg": 0.009,
+            "bc_emission_g_per_kg": 0.07,
+            "co2_eq_kg_per_kg": 1.23,
+            "energy_requirement_mj_per_kg": 3.0
+        },
+        {
+            "fertilizer_type": "total",
+            "ferti_replaced_kg_per_ton_compost": 16.6,
+            "co2_emission_g_per_kg": 21.2974,
+            "ch4_emission_g_per_kg": 0.0033768,
+            "n2o_emission_g_per_kg": 0.06854816,
+            "bc_emission_g_per_kg": 0.00429233,
+            "co2_eq_kg_per_kg": null,
+            "energy_requirement_mj_per_kg": null
+        }
+    ]
+}
 

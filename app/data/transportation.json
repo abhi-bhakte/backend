@@ -1,24 +1,109 @@
 {
-    "fuel_data": {
-        "Fuel Type": ["lpg", "petrol", "kerosene", "diesel", "cng", "Bio-diesel/ethanol","ev"],
-        "Energy Content (MJ/L)": [25.069, 35.44, 35.28, 36.372, 0.0333, 0, 0],
-        "CO2 Emission Factor (kg/MJ)": [0.0631, 0.0693, 0.0719, 0.0741, 0.0561, 0, 0],
-        "CH4 Emission Factor (kg/MJ)": [0.000062, 0.000033, 0.0000039, 0.0000039, 0.000092, 0.00026, 0],
-        "N2O Emission Factor (kg/MJ)": [0.0000002, 0.0000032, 0.0000039, 0.0000039, 0.000003, 0.000041, 0],
-        "BC Emissions (kg/MJ)": [0.0000234, 0.0000234, 0.0000234, 0.0000234, 0.00000005, null, 0],
-        "Fuel Density (kg/L)": [0.53, 0.8, 0.8, 0.84, 0.00074, null, 0]
-    },
-    "vehicle_emission_factors": {
-        "Vehicle Type": ["Both modern and older trucks", "Modern trucks", "Older trucks"],
-        "BC Emission Factor (kg/kg fuel)": [0.00143, 0.00047, 0.00239],
-        "OC Emission Factor (kg/kg fuel)": [0.00054, 0.00008, 0.001]
-    },
+    "fuel_data": [
+        {
+            "fuel_type": "lpg",
+            "energy_content_mj_per_l": 25.069,
+            "density_kg_per_l": 0.53,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0631,
+                "ch4_kg_per_mj": 0.000062,
+                "n2o_kg_per_mj": 0.0000002,
+                "bc_kg_per_mj": 0.0000234
+            }
+            
+        },
+        {
+            "fuel_type": "petrol",
+            "energy_content_mj_per_l": 35.44,
+            "density_kg_per_l": 0.8,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0693,
+                "ch4_kg_per_mj": 0.000033,
+                "n2o_kg_per_mj": 0.0000032,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "kerosene",
+            "energy_content_mj_per_l": 35.28,
+            "density_kg_per_l": 0.8,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0719,
+                "ch4_kg_per_mj": 0.0000039,
+                "n2o_kg_per_mj": 0.0000039,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "diesel",
+            "energy_content_mj_per_l": 36.372,
+            "density_kg_per_l": 0.84,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0741,
+                "ch4_kg_per_mj": 0.0000039,
+                "n2o_kg_per_mj": 0.0000039,
+                "bc_kg_per_mj": 0.0000234
+            } 
+        },
+        {
+            "fuel_type": "cng",
+            "energy_content_mj_per_l": 0.0333,
+            "density_kg_per_l": 0.00074,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0561,
+                "ch4_kg_per_mj": 0.000092,
+                "n2o_kg_per_mj": 0.000003,
+                "bc_kg_per_mj": 0.00000005
+            }
+        },
+        {
+            "fuel_type": "bio_diesel_ethanol",
+            "energy_content_mj_per_l": 0,
+            "density_kg_per_l": null,
+            "emission_factors": {
+                "co2_kg_per_mj": 0,
+                "ch4_kg_per_mj": 0.00026,
+                "n2o_kg_per_mj": 0.000041,
+                "bc_kg_per_mj": null
+            }
+        },
+        {
+            "fuel_type": "ev",
+            "energy_content_mj_per_l": 0,
+            "density_kg_per_l": 0,
+            "emission_factors": {
+                "co2_kg_per_mj": 0,
+                "ch4_kg_per_mj": 0,
+                "n2o_kg_per_mj": 0,
+                "bc_kg_per_mj": 0
+            }
+        }
+    ],
+    "vehicle_emission_factors": [
+        {
+            "vehicle_type": "both_modern_and_older_trucks",
+            "bc_kg_per_kg_fuel": 0.00143,
+            "oc_kg_per_kg_fuel": 0.00054
+        },
+        {
+            "vehicle_type": "modern_trucks",
+            "bc_kg_per_kg_fuel": 0.00047,
+            "oc_kg_per_kg_fuel": 0.00008
+        },
+        {
+            "vehicle_type": "older_trucks",
+            "bc_kg_per_kg_fuel": 0.00239,
+            "oc_kg_per_kg_fuel": 0.001
+        }
+    ],
     "gwp_factors": {
-        "Type of gas": ["CO2", "CH4-biogenic", "CH4-fossil", "N2O", "BC"],
-        "GWP20": [1, 84, 85, 264, 2100],
-        "GWP100": [1, 28, 30, 265, 590]
+        "co2": { "gwp20": 1, "gwp100": 1 },
+        "ch4_biogenic": { "gwp20": 84, "gwp100": 28 },
+        "ch4_fossil": { "gwp20": 85, "gwp100": 30 },
+        "n2o": { "gwp20": 264, "gwp100": 265 },
+        "bc": { "gwp20": 2100, "gwp100": 590 }
     },
     "electricity_grid_factor": {
-        "CO2 kg-eq/kWh": 0.896515846
+        "co2_kg_per_kwh": 0.896515846
     }
 }
