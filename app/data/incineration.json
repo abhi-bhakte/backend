@@ -1,115 +1,178 @@
 {
-    "fuel_data": {
-        "Fuel Type": ["lpg", "petrol", "kerosene", "diesel", "cng", "coal"],
-        "Energy Content (MJ/L)": [25.069, 35.44, 35.28, 36.372, 0.0333, 23.86],
-        "CO2 Emission Factor (kg/MJ)": [0.0631, 0.0693, 0.0719, 0.0741, 0.0561, 0.0983],
-        "CH4 Emission Factor (kg/MJ)": [0.000003, 0.000003, 0.000003, 0.000003, 0.0000003, 0.000001],
-        "N2O Emission Factor (kg/MJ)": [0.0000006, 0.0000006, 0.0000006, 0.0000006, 0.0000001, 0.0000015],
-        "BC Emission Factor (kg/MJ)": [0.0000234, 0.0000234, 0.0000234, 0.0000234, 0.00000005, 0.00001408],
-        "Fuel Density (kg/L)": [0.51, 0.8, 0.8, 0.84, 0.00074, 1]
-    },
+    "fuel_data": [
+        {
+            "fuel_type": "lpg",
+            "energy_content_mj_per_l": 25.069,
+            "density_kg_per_l": 0.51,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0631,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "petrol",
+            "energy_content_mj_per_l": 35.44,
+            "density_kg_per_l": 0.8,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0693,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "kerosene",
+            "energy_content_mj_per_l": 35.28,
+            "density_kg_per_l": 0.8,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0719,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "diesel",
+            "energy_content_mj_per_l": 36.372,
+            "density_kg_per_l": 0.84,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0741,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "cng",
+            "energy_content_mj_per_l": 45,
+            "density_kg_per_l": 0.00074,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0561,
+                "ch4_kg_per_mj": 0.0000003,
+                "n2o_kg_per_mj": 0.0000001,
+                "bc_kg_per_mj": 0.00000005
+            }
+        },
+        {
+            "fuel_type": "coal",
+            "energy_content_mj_per_l": 23.86,
+            "density_kg_per_l": 1,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0983,
+                "ch4_kg_per_mj": 0.000001,
+                "n2o_kg_per_mj": 0.0000015,
+                "bc_kg_per_mj": 0.00001408
+            }
+        }
+    ],
     "electricity_grid_factor": {
-        "CO2 kg-eq/kWh": 0.896515846
+        "co2_kg_per_kwh": 0.896515846
     },
-    "incineration_emissions": {
-        "continuous_stoker": {
-            "CH4 emissions (kg/tonne of wet waste)": 0.0002,
-            "N2O emissions (kg/tonne of wet waste)": 0.047,
-            "BC emissions (kg/tonne of wet waste)": 0.322
+    "incineration_emissions": [
+        {
+            "type": "continuous_stoker",
+            "ch4_kg_per_ton": 0.0002,
+            "n2o_kg_per_ton": 0.047,
+            "bc_kg_per_ton": 0.322
         },
-        "continuous_fluidized_bed": {
-            "CH4 emissions (kg/tonne of wet waste)": 0,
-            "N2O emissions (kg/tonne of wet waste)": 0.067,
-            "BC emissions (kg/tonne of wet waste)": 0.322
+        {
+            "type": "continuous_fluidized_bed",
+            "ch4_kg_per_ton": 0.0,
+            "n2o_kg_per_ton": 0.067,
+            "bc_kg_per_ton": 0.322
         },
-        "semi_continuous_stoker": {
-            "CH4 emissions (kg/tonne of wet waste)": 0.006,
-            "N2O emissions (kg/tonne of wet waste)": 0.041,
-            "BC emissions (kg/tonne of wet waste)": 0.322
+        {
+            "type": "semi_continuous_stoker",
+            "ch4_kg_per_ton": 0.006,
+            "n2o_kg_per_ton": 0.041,
+            "bc_kg_per_ton": 0.322
         },
-        "semi_continuous_fluidized_bed": {
-            "CH4 emissions (kg/tonne of wet waste)": 0.188,
-            "N2O emissions (kg/tonne of wet waste)": 0.068,
-            "BC emissions (kg/tonne of wet waste)": 0.322
+        {
+            "type": "semi_continuous_fluidized_bed",
+            "ch4_kg_per_ton": 0.188,
+            "n2o_kg_per_ton": 0.068,
+            "bc_kg_per_ton": 0.322
         }
-    },
-    "fossil_based_co2_emissions": {
-        "Food waste": {
-            "Dry matter content (%)": 40,
-            "Total carbon content (%)": 38,
-            "Fossil carbon fraction (%)": 0,
-            "Oxidation factor (%)": 100,
-            "Mixed Waste Composition (%)": 23.73
+    ],
+    "fossil_based_co2_emissions": [
+        {
+            "waste_type": "food",
+            "dry_matter_percent": 40,
+            "total_carbon_percent": 38,
+            "fossil_carbon_percent": 0,
+            "oxidation_factor_percent": 100
         },
-        "Garden waste": {
-            "Dry matter content (%)": 40,
-            "Total carbon content (%)": 49,
-            "Fossil carbon fraction (%)": 0,
-            "Oxidation factor (%)": 100,
-            "Mixed Waste Composition (%)": 0.00
+        {
+            "waste_type": "garden",
+            "dry_matter_percent": 40,
+            "total_carbon_percent": 49,
+            "fossil_carbon_percent": 0,
+            "oxidation_factor_percent": 100
         },
-        "Plastics": {
-            "Dry matter content (%)": 100,
-            "Total carbon content (%)": 75,
-            "Fossil carbon fraction (%)": 100,
-            "Oxidation factor (%)": 100,
-            "Mixed Waste Composition (%)": 0.00
+        {
+            "waste_type": "plastics",
+            "dry_matter_percent": 100,
+            "total_carbon_percent": 75,
+            "fossil_carbon_percent": 100,
+            "oxidation_factor_percent": 100
         },
-        "Paper": {
-            "Dry matter content (%)": 90,
-            "Total carbon content (%)": 46,
-            "Fossil carbon fraction (%)": 1,
-            "Oxidation factor (%)": 100,
-            "Mixed Waste Composition (%)": 0.00
+        {
+            "waste_type": "paper",
+            "dry_matter_percent": 90,
+            "total_carbon_percent": 46,
+            "fossil_carbon_percent": 1,
+            "oxidation_factor_percent": 100
         },
-        "Textile": {
-            "Dry matter content (%)": 80,
-            "Total carbon content (%)": 50,
-            "Fossil carbon fraction (%)": 20,
-            "Oxidation factor (%)": 100,
-            "Mixed Waste Composition (%)": 5.76
+        {
+            "waste_type": "textile",
+            "dry_matter_percent": 80,
+            "total_carbon_percent": 50,
+            "fossil_carbon_percent": 20,
+            "oxidation_factor_percent": 100
         },
-        "Leather/rubber": {
-            "Dry matter content (%)": 84,
-            "Total carbon content (%)": 67,
-            "Fossil carbon fraction (%)": 20,
-            "Oxidation factor (%)": 100,
-            "Mixed Waste Composition (%)": 1.84
+        {
+            "waste_type": "rubber",
+            "dry_matter_percent": 84,
+            "total_carbon_percent": 67,
+            "fossil_carbon_percent": 20,
+            "oxidation_factor_percent": 100
         },
-        "Glass": {
-            "Dry matter content (%)": 100,
-            "Total carbon content (%)": 0,
-            "Fossil carbon fraction (%)": 0,
-            "Oxidation factor (%)": 0,
-            "Mixed Waste Composition (%)": 0.00
+        {
+            "waste_type": "glass",
+            "dry_matter_percent": 100,
+            "total_carbon_percent": 0,
+            "fossil_carbon_percent": 0,
+            "oxidation_factor_percent": 0
         },
-        "Metal (aluminium + steel)": {
-            "Dry matter content (%)": 100,
-            "Total carbon content (%)": 0,
-            "Fossil carbon fraction (%)": 0,
-            "Oxidation factor (%)": 0,
-            "Mixed Waste Composition (%)": 0.00
+        {
+            "waste_type": "metal",
+            "dry_matter_percent": 100,
+            "total_carbon_percent": 0,
+            "fossil_carbon_percent": 0,
+            "oxidation_factor_percent": 0
         },
-        "Nappies/diapers (disposable)": {
-            "Dry matter content (%)": 40,
-            "Total carbon content (%)": 70,
-            "Fossil carbon fraction (%)": 10,
-            "Oxidation factor (%)": 100,
-            "Mixed Waste Composition (%)": 0.00
+        {
+            "waste_type": "nappies_diapers",
+            "dry_matter_percent": 40,
+            "total_carbon_percent": 70,
+            "fossil_carbon_percent": 10,
+            "oxidation_factor_percent": 100
         },
-        "Wood": {
-            "Dry matter content (%)": 85,
-            "Total carbon content (%)": 50,
-            "Fossil carbon fraction (%)": 0,
-            "Oxidation factor (%)": 100,
-            "Mixed Waste Composition (%)": 18.2
+        {
+            "waste_type": "wood",
+            "dry_matter_percent": 85,
+            "total_carbon_percent": 50,
+            "fossil_carbon_percent": 0,
+            "oxidation_factor_percent": 100
         },
-        "Others": {
-            "Dry matter content (%)": 90,
-            "Total carbon content (%)": 3,
-            "Fossil carbon fraction (%)": 100,
-            "Oxidation factor (%)": 0,
-            "Mixed Waste Composition (%)": 50.46
+        {
+            "waste_type": "others",
+            "dry_matter_percent": 90,
+            "total_carbon_percent": 3,
+            "fossil_carbon_percent": 100,
+            "oxidation_factor_percent": 0
         }
-    }
+    ]
 }

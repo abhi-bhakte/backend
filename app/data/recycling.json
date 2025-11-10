@@ -1,14 +1,79 @@
 {
-    "fuel_data": {
-        "Fuel Type": ["lpg", "petrol", "kerosene", "diesel", "cng", "coal"],
-        "Energy Content (MJ/L)": [25.069, 35.44, 35.28, 36.372, 0.0333, 23.86],
-        "CO2 Emission Factor (kg/MJ)": [0.0631, 0.0693, 0.0719, 0.0741, 0.0561, 0.0983],
-        "CH4 Emission Factor (kg/MJ)": [0.000003, 0.000003, 0.000003, 0.000003, 0.0000003, 0.000001],
-        "N2O Emission Factor (kg/MJ)": [0.0000006, 0.0000006, 0.0000006, 0.0000006, 0.0000001, 0.0000015],
-        "BC Emission Factor (kg/MJ)": [0.0000234, 0.0000234, 0.0000234, 0.0000234, 0.00000005, 0.00001408],
-        "Fuel Density (kg/L)": [0.51, 0.8, 0.8, 0.84, 0.00074, 1]
+    "recycling_emissions": {
+        "ipcc_default_values": {
+            "ch4_kg_per_ton": 2,
+            "n2o_kg_per_ton": 0.1
+        }
     },
+    "fuel_data": [
+        {
+            "fuel_type": "lpg",
+            "energy_content_mj_per_l": 25.069,
+            "density_kg_per_l": 0.51,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0631,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "petrol",
+            "energy_content_mj_per_l": 35.44,
+            "density_kg_per_l": 0.8,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0693,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "kerosene",
+            "energy_content_mj_per_l": 35.28,
+            "density_kg_per_l": 0.8,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0716,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "diesel",
+            "energy_content_mj_per_l": 36.372,
+            "density_kg_per_l": 0.84,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0741,
+                "ch4_kg_per_mj": 0.000003,
+                "n2o_kg_per_mj": 0.0000006,
+                "bc_kg_per_mj": 0.0000234
+            }
+        },
+        {
+            "fuel_type": "cng",
+            "energy_content_mj_per_l": 45,
+            "density_kg_per_l": 0.00074,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0561,
+                "ch4_kg_per_mj": 0.0000003,
+                "n2o_kg_per_mj": 0.0000001,
+                "bc_kg_per_mj": 0.00000005
+            }
+        },
+        {
+            "fuel_type": "coal",
+            "energy_content_mj_per_l": 23.86,
+            "density_kg_per_l": 1.0,
+            "emission_factors": {
+                "co2_kg_per_mj": 0.0983,
+                "ch4_kg_per_mj": 0.000001,
+                "n2o_kg_per_mj": 0.0000015,
+                "bc_kg_per_mj": 0.00001408
+            }
+        }
+    ],
     "electricity_grid_factor": {
-        "CO2 kg-eq/kWh": 0.896515846
+        "co2_kg_eq_per_kwh": 0.896515846
     }
 }

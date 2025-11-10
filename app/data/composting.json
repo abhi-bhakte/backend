@@ -52,7 +52,7 @@
         },
         {
             "fuel_type": "cng",
-            "energy_content_mj_per_l": 0.03,
+            "energy_content_mj_per_l": 45,
             "density_kg_per_l": 0.00074,
             "emission_factors": {
                 "co2_kg_per_mj": 0.056,

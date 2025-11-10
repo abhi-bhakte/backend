@@ -47,7 +47,7 @@
         },
         {
             "fuel_type": "cng",
-            "energy_content_mj_per_l": 0.0333,
+            "energy_content_mj_per_l": 45,
             "density_kg_per_l": 0.00074,
             "emission_factors": {
                 "co2_kg_per_mj": 0.0561,
@@ -65,17 +65,6 @@
                 "ch4_kg_per_mj": 0.00026,
                 "n2o_kg_per_mj": 0.000041,
                 "bc_kg_per_mj": null
-            }
-        },
-        {
-            "fuel_type": "ev",
-            "energy_content_mj_per_l": 0,
-            "density_kg_per_l": 0,
-            "emission_factors": {
-                "co2_kg_per_mj": 0,
-                "ch4_kg_per_mj": 0,
-                "n2o_kg_per_mj": 0,
-                "bc_kg_per_mj": 0
             }
         }
     ],
