@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends, Body, status
+
+import logging
+from fastapi import APIRouter, HTTPException, Depends, Body, status, Request
 from app.models.input_models.waste_data import WasteData
 from app.db.db import get_db
 from bson import ObjectId
@@ -11,11 +13,18 @@ COLLECTION_NAME = "waste_data"
 
 @router.post("/", summary="Submit city waste data")
 async def submit_waste_data(
-    data: WasteData,
+    request: Request,
     db=Depends(get_db),
-    current_user=Depends(get_current_user)  # <-- get the logged-in user
+    current_user=Depends(get_current_user)
 ):
-    data.user_id = str(current_user["_id"])  # <-- set user_id from logged-in user
+    try:
+        payload = await request.json()
+        logging.info(f"Incoming waste data payload: {payload}")
+        data = WasteData(**payload)
+    except Exception as e:
+        logging.error(f"Validation or parsing error: {e}")
+        return {"error": str(e), "payload": payload if 'payload' in locals() else None}
+    data.user_id = str(current_user["_id"])
     result = await db[COLLECTION_NAME].insert_one(data.dict())
     return {"message": "Waste data submitted", "id": str(result.inserted_id)}
 

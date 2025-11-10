@@ -28,8 +28,7 @@ def calculate_recycling_emissions(request: RecyclingRequest):
             material_composition_formal=request.material_composition_formal,
             material_composition_informal=request.material_composition_informal,
             electricity_consumed=request.electricity_consumed,
-            fuel_types_operation=request.fuel_types_operation,
-            fuel_consumed_operation=request.fuel_consumed_operation,
+            fuel_consumption=request.fuel_consumption,
             recyclability=request.recyclability
         )
 
