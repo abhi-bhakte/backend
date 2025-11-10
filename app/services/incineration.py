@@ -3,49 +3,46 @@ from pathlib import Path
 from .transportation import TransportationEmissions
 
 
+
 class IncinerationEmissions:
     """
     A class to calculate emissions from incineration processes.
-
-    Attributes:
-        waste_incinerated (float): Amount of waste incinerated (ton/day).
-        incineration_type (str): Type of incineration.
-        fossil_fuel_types (list): List of fossil fuel types used for operation activities.
-        fossil_fuel_consumptions (list): List of fossil fuel consumption values (liters/day).
-        electricity_used (float): Electricity used for operation activities (kWh/day).
-        energy_recovery_type (str): Type of energy recovered (e.g., heat, electricity).
-        efficiency_electricity_recovery (float): Efficiency of electricity recovery.
-        percentage_electricity_used_onsite (float): Percentage of electricity used onsite.
-        efficiency_heat_recovery (float): Efficiency of heat recovery.
-        percentage_heat_used_onsite (float): Percentage of recovered heat used onsite.
-        fossil_fuel_replaced (list): List of fossil fuel types replaced by recovered heat.
+    Accepts grouped input sections: fuel_consumption, incinerator_info, energy_recovery.
     """
+
 
     def __init__(
         self,
         waste_incinerated: float,
-        incineration_type: str,
-        fossil_fuel_types: list,
-        fossil_fuel_consumptions: list,
-        electricity_used: float,
-        energy_recovery_type: str,
-        efficiency_electricity_recovery: float,
-        percentage_electricity_used_onsite: float,
-        efficiency_heat_recovery: float,
-        percentage_heat_used_onsite: float,
-        fossil_fuel_replaced: list,
+        electricity_kwh_per_day: float,
+        fuel_consumption: dict,
+        incinerator_info: dict,
+        energy_recovery: dict,
+        mixed_waste_composition: dict,
     ):
         self.waste_incinerated = waste_incinerated
-        self.incineration_type = incineration_type
-        self.fossil_fuel_types = fossil_fuel_types
-        self.fossil_fuel_consumptions = fossil_fuel_consumptions
-        self.electricity_used = electricity_used
-        self.energy_recovery_type = energy_recovery_type
-        self.efficiency_electricity_recovery = efficiency_electricity_recovery
-        self.percentage_electricity_used_onsite = percentage_electricity_used_onsite
-        self.efficiency_heat_recovery = efficiency_heat_recovery
-        self.percentage_heat_used_onsite = percentage_heat_used_onsite
-        self.fossil_fuel_replaced = fossil_fuel_replaced
+        self.electricity_used = electricity_kwh_per_day
+
+        # Unpack fuel_consumption dict to lists for calculation
+        fc = fuel_consumption or {}
+        self.fossil_fuel_types = list(fc.keys())
+        self.fossil_fuel_consumptions = list(fc.values())
+
+        # Unpack incinerator_info
+        self.incineration_type = (incinerator_info or {}).get("incineration_type", "")
+        self.calorific_value_mj_per_kg = (incinerator_info or {}).get("calorific_value_mj_per_kg", None)
+
+        # Unpack energy_recovery
+        er = energy_recovery or {}
+        self.energy_recovery_type = er.get("energy_recovery_type", "")
+        self.efficiency_electricity_recovery = er.get("electricity_recovery_efficiency", 0)
+        self.percentage_electricity_used_onsite = er.get("electricity_used_onsite_percent", 0)
+        self.efficiency_heat_recovery = er.get("heat_recovery_efficiency", 0)
+        self.percentage_heat_used_onsite = er.get("recovered_heat_usage_percent", 0)
+        self.fossil_fuel_replaced = er.get("fossil_fuel_replaced", [])
+
+        # Unpack mixed waste composition
+        self.mixed_waste_composition = mixed_waste_composition or {}
 
         # Define file paths for data
         self.incineration_file = (
@@ -85,7 +82,7 @@ class IncinerationEmissions:
         Args:
             fuel_types (list): List of fuel types used.
             fuel_consumed (list): Corresponding fuel consumption in liters per tonne waste treated.
-            factor_key (str): Key for the emission factor in the JSON file.
+            factor_key (str): Key for the emission factor in the JSON file (e.g., 'co2_kg_per_mj').
             per_waste (float): Amount of waste incinerated.
 
         Returns:
@@ -97,14 +94,14 @@ class IncinerationEmissions:
             fuel_consumed = [fuel_consumed]
 
         total_emissions = 0
-        fuel_data = self.data_incineration.get("fuel_data", {})
-        available_fuels = fuel_data.get("Fuel Type", [])
+        fuel_data = self.data_incineration.get("fuel_data", [])
 
         for fuel, consumption in zip(fuel_types, fuel_consumed):
-            if fuel in available_fuels:
-                fuel_index = available_fuels.index(fuel)
-                energy_content = fuel_data["Energy Content (MJ/L)"][fuel_index]
-                emission_factor = fuel_data[factor_key][fuel_index]
+            fuel_entry = next((f for f in fuel_data if f.get("fuel_type") == fuel), None)
+            if fuel_entry is not None:
+                energy_content = fuel_entry.get("energy_content_mj_per_l", 0)
+                emission_factors = fuel_entry.get("emission_factors", {})
+                emission_factor = emission_factors.get(factor_key, 0)
                 total_emissions += consumption * energy_content * emission_factor
 
         return total_emissions / per_waste if per_waste > 0 else 0
@@ -116,27 +113,19 @@ class IncinerationEmissions:
         Retrieve the emission factor for a given incineration type and emission type.
 
         Args:
-            incineration_type (str): Type of incineration.
-            emission_type (str): Type of emission.
+            incineration_type (str): Type of incineration (e.g., 'continuous_stoker').
+            emission_type (str): Type of emission (e.g., 'ch4_kg_per_ton').
 
         Returns:
             float: Emission factor for the given incineration type and emission type.
         """
-        incineration_emissions = self.data_incineration.get("incineration_emissions", {})
-
-        if incineration_type not in incineration_emissions:
-            raise ValueError(
-                f"Incineration type '{incineration_type}' not found in the dataset."
-            )
-
-        emissions_data = incineration_emissions[incineration_type]
-
-        if emission_type not in emissions_data:
-            raise ValueError(
-                f"Emission type '{emission_type}' not found for incineration type '{incineration_type}'."
-            )
-
-        return emissions_data[emission_type]
+        incineration_emissions = self.data_incineration.get("incineration_emissions", [])
+        entry = next((e for e in incineration_emissions if e.get("type") == incineration_type), None)
+        if entry is None:
+            raise ValueError(f"Incineration type '{incineration_type}' not found in the dataset.")
+        if emission_type not in entry:
+            raise ValueError(f"Emission type '{emission_type}' not found for incineration type '{incineration_type}'.")
+        return entry[emission_type]
 
     def ch4_emit_incineration(self) -> float:
         """
@@ -146,18 +135,16 @@ class IncinerationEmissions:
             float: Total CH4 emissions in terms of CO2-equivalent (kg CO2e).
         """
         gwp_factors = self.data_trans.get("gwp_factors", {})
-        methane_fossil_index = gwp_factors["Type of gas"].index("CH4-fossil")
-        methane_bio_index = gwp_factors["Type of gas"].index("CH4-biogenic")
-        gwp_100_fossil = gwp_factors["GWP100"][methane_fossil_index]
-        gwp_100_biogenic = gwp_factors["GWP100"][methane_bio_index]
+        gwp_100_fossil = gwp_factors.get("ch4_fossil", {}).get("gwp100", 0)
+        gwp_100_biogenic = gwp_factors.get("ch4_biogenic", {}).get("gwp100", 0)
 
         ch4_waste_combustion = self.waste_combustion_emissions(
-            self.incineration_type, "CH4 emissions (kg/tonne of wet waste)"
+            self.incineration_type, "ch4_kg_per_ton"
         )
         ch4_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_types,
             self.fossil_fuel_consumptions,
-            "CH4 Emission Factor (kg/MJ)",
+            "ch4_kg_per_mj",
             self.waste_incinerated,
         )
 
@@ -186,25 +173,26 @@ class IncinerationEmissions:
             float: Total CO2 emissions (kg CO2e).
         """
         grid_emission_factor = self.data_trans.get("electricity_grid_factor", {})
-        co2_per_kwh = grid_emission_factor.get("CO2 kg-eq/kWh", 0)
-        total_co2_electricity = self.electricity_used * co2_per_kwh / self.waste_incinerated
+        co2_per_kwh = grid_emission_factor.get("co2_kg_per_kwh", 0)
+        total_co2_electricity = self.electricity_used * co2_per_kwh / self.waste_incinerated if self.waste_incinerated > 0 else 0
 
         co2_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_types,
             self.fossil_fuel_consumptions,
-            "CO2 Emission Factor (kg/MJ)",
+            "co2_kg_per_mj",
             self.waste_incinerated,
         )
 
-        fossil_based_co2_emissions = self.data_incineration.get("fossil_based_co2_emissions", {})
+        fossil_based_co2_emissions = self.data_incineration.get("fossil_based_co2_emissions", [])
         total_co2_waste_combustion = 0
-        for waste_type, properties in fossil_based_co2_emissions.items():
-            dry_matter_content = properties.get("Dry matter content (%)", 0)
-            total_carbon_content = properties.get("Total carbon content (%)", 0)
-            fossil_carbon_fraction = properties.get("Fossil carbon fraction (%)", 0)
-            oxidation_factor = properties.get("Oxidation factor (%)", 0)
-            mixed_waste_composition = properties.get("Mixed Waste Composition (%)", 0)
-
+        for properties in fossil_based_co2_emissions:
+            dry_matter_content = properties.get("dry_matter_percent", 0)
+            total_carbon_content = properties.get("total_carbon_percent", 0)
+            fossil_carbon_fraction = properties.get("fossil_carbon_percent", 0)
+            oxidation_factor = properties.get("oxidation_factor_percent", 0)
+            waste_type = properties.get("waste_type", "")
+            # Get user-provided composition for this waste type
+            user_percent = self.mixed_waste_composition.get(waste_type.lower().replace("/", "_").replace(" ", "_"), 0)
 
             fossil_carbon_wet_waste = (
                 (dry_matter_content / 100)
@@ -212,16 +200,13 @@ class IncinerationEmissions:
                 * (fossil_carbon_fraction / 100)
                 * (oxidation_factor / 100)
             )
-            
             co2_emission = (
                 1000
                 * fossil_carbon_wet_waste
-                * (mixed_waste_composition / 100)
+                * (user_percent / 100)
                 * (44 / 12)
             )
-            
             total_co2_waste_combustion += co2_emission
-
 
         total_co2_emissions = total_co2_electricity + co2_fuel_combustion + total_co2_waste_combustion
         return total_co2_emissions
@@ -244,16 +229,15 @@ class IncinerationEmissions:
             float: Total N2O emissions in terms of CO2-equivalent (kg CO2e).
         """
         gwp_factors = self.data_trans.get("gwp_factors", {})
-        n2o_index = gwp_factors["Type of gas"].index("N2O")
-        gwp_100_n2o = gwp_factors["GWP100"][n2o_index]
+        gwp_100_n2o = gwp_factors.get("n2o", {}).get("gwp100", 0)
 
         n2o_waste_combustion = self.waste_combustion_emissions(
-            self.incineration_type, "N2O emissions (kg/tonne of wet waste)"
+            self.incineration_type, "n2o_kg_per_ton"
         )
         n2o_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_types,
             self.fossil_fuel_consumptions,
-            "N2O Emission Factor (kg/MJ)",
+            "n2o_kg_per_mj",
             self.waste_incinerated,
         )
 
@@ -270,29 +254,23 @@ class IncinerationEmissions:
         # Placeholder logic for N2O emissions avoided
         return 0.0
 
-    def bc_emit_incineration(self) -> float:
+    def bc_emit_incineration(self):
         """
         Calculate BC (black carbon) emissions from incineration.
-
         Returns:
-            float: Total BC emissions in terms of CO2-equivalent (kg CO2e).
+            float: BC mass in kg/ton.
         """
-        gwp_factors = self.data_trans.get("gwp_factors", {})
-        bc_index = gwp_factors["Type of gas"].index("BC")
-        gwp_100_bc = gwp_factors["GWP100"][bc_index]
-
         bc_waste_combustion = self.waste_combustion_emissions(
-            self.incineration_type, "BC emissions (kg/tonne of wet waste)"
+            self.incineration_type, "bc_kg_per_ton"
         )
         bc_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_types,
             self.fossil_fuel_consumptions,
-            "BC Emission Factor (kg/MJ)",
+            "bc_kg_per_mj",
             self.waste_incinerated,
         )
-
-        total_bc_emissions = gwp_100_bc * (bc_fuel_combustion + bc_waste_combustion)
-        return total_bc_emissions
+        bc_mass = bc_fuel_combustion + bc_waste_combustion
+        return bc_mass
 
     def bc_avoid_incineration(self) -> float:
         """
@@ -307,42 +285,34 @@ class IncinerationEmissions:
     def overall_emissions(self):
         """
         Calculate kgCO2e emissions and emissions avoided per ton of waste treated for incineration.
-
         Returns:
             dict: A dictionary containing emissions, avoided emissions, total emissions, 
-                total avoided emissions, and net emissions.
+                total avoided emissions, and net emissions. BC is reported as both mass (kg/ton) and CO2e (kgCO2e/ton).
         """
+        ch4_e = self.ch4_emit_incineration()
+        ch4_a = self.ch4_avoid_incineration()
+        co2_e = self.co2_emit_incineration()
+        co2_a = self.co2_avoid_incineration()
+        n2o_e = self.n2o_emit_incineration()
+        n2o_a = self.n2o_avoid_incineration()
+        bc_e = self.bc_emit_incineration()
+        bc_a = self.bc_avoid_incineration()
+
+        # Totals in CO2e exclude BC mass
+        total_emissions = ch4_e + co2_e + n2o_e
+        total_emissions_avoid = ch4_a + co2_a + n2o_a
+
         return {
-            "ch4_emissions": self.ch4_emit_incineration(),
-            "ch4_emissions_avoid": self.ch4_avoid_incineration(),
-            "co2_emissions": self.co2_emit_incineration(),
-            "co2_emissions_avoid": self.co2_avoid_incineration(),
-            "n2o_emissions": self.n2o_emit_incineration(),
-            "n2o_emissions_avoid": self.n2o_avoid_incineration(),
-            "bc_emissions": self.bc_emit_incineration(),
-            "bc_emissions_avoid": self.bc_avoid_incineration(),
-            "total_emissions": (
-                self.ch4_emit_incineration()
-                + self.co2_emit_incineration()
-                + self.n2o_emit_incineration()
-                + self.bc_emit_incineration()
-            ),
-            "total_emissions_avoid": (
-                self.ch4_avoid_incineration()
-                + self.co2_avoid_incineration()
-                + self.n2o_avoid_incineration()
-                + self.bc_avoid_incineration()
-            ),
-            "net_emissions": (
-                self.ch4_emit_incineration()
-                + self.co2_emit_incineration()
-                + self.n2o_emit_incineration()
-                + self.bc_emit_incineration()
-                - (
-                    self.ch4_avoid_incineration()
-                    + self.co2_avoid_incineration()
-                    + self.n2o_avoid_incineration()
-                    + self.bc_avoid_incineration()
-                )
-            ),
+            "ch4_emissions": ch4_e,
+            "ch4_emissions_avoid": ch4_a,
+            "co2_emissions": co2_e,
+            "co2_emissions_avoid": co2_a,
+            "n2o_emissions": n2o_e,
+            "n2o_emissions_avoid": n2o_a,
+            "bc_emissions": bc_e,
+            "bc_emissions_avoid": bc_a,
+            "total_emissions": total_emissions,
+            "total_emissions_avoid": total_emissions_avoid,
+            "net_emissions": total_emissions - total_emissions_avoid,
+            "net_emissions_bc": bc_e - bc_a,
         }

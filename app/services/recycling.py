@@ -1,3 +1,10 @@
+"""
+NOTE:
+For CNG and coal, the energy content values in the JSON file are actually in units of MJ per kg, 
+not MJ per liter. However, for consistency, the JSON key remains "energy_content_mj_per_l". 
+Users should enter CNG and coal consumption in kg, and the code will interpret the energy 
+content accordingly for these fuels. This is to maintain database structure consistency.
+"""
 import json
 from pathlib import Path
 from .transportation import TransportationEmissions
@@ -24,29 +31,29 @@ class RecyclingEmissions:
         material_composition_formal: dict,
         material_composition_informal: dict,
         electricity_consumed: dict,
-        fuel_types_operation: dict,
-        fuel_consumed_operation: dict,
+        fuel_consumption: dict, 
         recyclability: dict,
     ):
-
         # Validate inputs
         if any(x < 0 for x in [recycle_collected_formal, recycle_collected_informal]):
             raise ValueError("Recyclable collection values cannot be negative.")
-        if any(value < 0 for material in electricity_consumed.values() for value in [material]):
+        if any(value < 0 for value in electricity_consumed.values()):
             raise ValueError("Electricity consumption values cannot be negative.")
-        if any(val < 0 for material in fuel_consumed_operation.values() for val in material):
-            raise ValueError("Fuel consumption values cannot be negative.")
+        for mat, fuels in fuel_consumption.items():
+            if any(v < 0 for v in fuels.values()):
+                raise ValueError(f"Fuel consumption values for {mat} cannot be negative.")
 
-        # Initialize attributes
         self.recycle_collected_formal = recycle_collected_formal
-        print(f"Recycling collected formal: {self.recycle_collected_formal}")
         self.recycle_collected_informal = recycle_collected_informal
         self.material_composition_formal = material_composition_formal
         self.material_composition_informal = material_composition_informal
         self.electricity_consumed = electricity_consumed
-        self.fuel_types_operation = fuel_types_operation
-        self.fuel_consumed_operation = fuel_consumed_operation
         self.recyclability = recyclability
+        self.fuel_types_operation = {}
+        self.fuel_consumed_operation = {}
+        for material, fuels in fuel_consumption.items():
+            self.fuel_types_operation[material] = list(fuels.keys())
+            self.fuel_consumed_operation[material] = list(fuels.values())
 
         # Define file paths for data
         self.recycling_file = Path(__file__).parent.parent / "data" / "recycling.json"
@@ -76,7 +83,7 @@ class RecyclingEmissions:
         Args:
             fuel_types (list[str]): List of fuel types used.
             fuel_consumed (list[float]): Corresponding fuel consumption in liters per tonne waste treated.
-            factor_key (str): Key for the emission factor in the JSON file.
+            factor_key (str): Key for the emission factor in the JSON file (should match emission_factors keys directly).
 
         Returns:
             float: Emissions per ton of waste.
@@ -89,19 +96,19 @@ class RecyclingEmissions:
 
         total_emissions = 0
 
-        # Retrieve fuel data from the dataset
-        fuel_data = self.data_recycling.get("fuel_data", {})
-        available_fuels = fuel_data.get("Fuel Type", [])
+        # Retrieve fuel data from the dataset (now a list of dicts)
+        fuel_data_list = self.data_recycling.get("fuel_data", [])
 
         # Iterate through each fuel type and compute emissions
         for fuel, consumption in zip(fuel_types, fuel_consumed):
-            if fuel in available_fuels:
-                fuel_index = available_fuels.index(fuel)
-                energy_content = fuel_data["Energy Content (MJ/L)"][fuel_index]
-                emission_factor = fuel_data[factor_key][fuel_index]
-
-                # Calculate emissions based on energy content and emission factor
-                total_emissions += consumption * energy_content * emission_factor
+            for fuel_entry in fuel_data_list:
+                if fuel_entry.get("fuel_type") == fuel:
+                    energy_content = fuel_entry.get("energy_content_mj_per_l", 0)
+                    emission_factors = fuel_entry.get("emission_factors", {})
+                    emission_factor = emission_factors.get(factor_key, 0)
+                    # Calculate emissions based on energy content and emission factor
+                    total_emissions += consumption * energy_content * emission_factor
+                    break
 
         return total_emissions
 
@@ -111,7 +118,7 @@ class RecyclingEmissions:
         optionally including emissions from electricity consumption.
 
         Args:
-            emission_factor_key (str): The key for the emission factor in the JSON file (e.g., "CH4 Emission Factor (kg/MJ)").
+            emission_factor_key (str): The key for the emission factor in the JSON file (e.g., "co2_kg_per_mj").
             include_electricity (bool): Whether to include electricity emissions in the calculation (default is False).
 
         Returns:
@@ -126,7 +133,7 @@ class RecyclingEmissions:
         )
 
         # Load the electricity grid factor from the JSON file (only if electricity is included)
-        grid_factor = self.data_recycling["electricity_grid_factor"]["CO2 kg-eq/kWh"] if include_electricity else 0
+        grid_factor = self.data_recycling["electricity_grid_factor"].get("co2_kg_eq_per_kwh", 0) if include_electricity else 0
 
         # Initialize total emissions for the formal and informal sectors
         total_emissions_formal = 0
@@ -138,7 +145,7 @@ class RecyclingEmissions:
             fuel_emissions = (composition_percentage / 100) * self._calculate_fuel_emissions(
                 self.fuel_types_operation.get(material, []),  # Fuel types for the material
                 self.fuel_consumed_operation.get(material, []),  # Fuel consumption for the material
-                emission_factor_key  # Emission factor key (e.g., CH₄, CO₂, N₂O)
+                emission_factor_key  # Emission factor key (e.g., "co2_kg_per_mj")
             )
             # Emissions from electricity (if included)
             electricity_emissions = (composition_percentage / 100) * (
@@ -156,7 +163,7 @@ class RecyclingEmissions:
             fuel_emissions = (composition_percentage / 100) * self._calculate_fuel_emissions(
                 self.fuel_types_operation.get(material, []),  # Fuel types for the material
                 self.fuel_consumed_operation.get(material, []),  # Fuel consumption for the material
-                emission_factor_key  # Emission factor key (e.g., CH₄, CO₂, N₂O)
+                emission_factor_key  # Emission factor key (e.g., "co2_kg_per_mj")
             )
             # Emissions from electricity (if included)
             electricity_emissions = (composition_percentage / 100) * (
@@ -171,14 +178,19 @@ class RecyclingEmissions:
         # Combine emissions from both sectors
         total_emissions = total_emissions_formal + total_emissions_informal
 
-
         return total_emissions
+
+    def _gwp100(self, key: str) -> float:
+        """Return GWP100 using the exact JSON key from transportation data."""
+        gwp = self.data_trans.get("gwp_factors", {})
+        return gwp.get(key, {}).get("gwp100", 0)
 
     def ch4_emit_recycling(self):
         """
         Calculate CH₄ emissions (kg CO₂-eq) per ton of waste recycled for both formal and informal sectors.
         """
-        return self.calculate_emissions("CH4 Emission Factor (kg/MJ)")
+        gwp_100_ch4 = self._gwp100("ch4_fossil")
+        return gwp_100_ch4 * self.calculate_emissions("ch4_kg_per_mj")
 
     def ch4_avoid_recycling(self):
         """
@@ -188,21 +200,21 @@ class RecyclingEmissions:
 
     def bc_emit_recycling(self):
         """
-        Calculate CH₄ emissions (kg CO₂-eq) per ton of waste recycled for both formal and informal sectors.
+        Calculate black carbon (BC) mass in kg per ton of waste recycled (not CO2e).
         """
-        return self.calculate_emissions("BC Emission Factor (kg/MJ)")
+        return self.calculate_emissions("bc_kg_per_mj")
 
     def bc_avoid_recycling(self):
         """
-        Placeholder for calculating CH₄ emissions (kg CO₂-eq) per ton of waste recycled.
+        Placeholder for calculating black carbon (BC) avoided (kg/ton).
         """
-        return (0)
+        return 0
 
     def co2_emit_recycling(self):
         """
         Calculate CO₂ emissions (kg CO₂-eq) per ton of waste recycled for both formal and informal sectors.
         """
-        return self.calculate_emissions("CO2 Emission Factor (kg/MJ)",include_electricity=True)
+        return self.calculate_emissions("co2_kg_per_mj", include_electricity=True)
 
     def co2_avoid_recycling(self):
         """
@@ -212,9 +224,10 @@ class RecyclingEmissions:
 
     def n2o_emit_recycling(self):
         """
-        Placeholder for calculating N₂O emissions per ton of waste recycled.
+        Calculate N₂O emissions (kg CO₂-eq) per ton of waste recycled for both formal and informal sectors.
         """
-        return self.calculate_emissions("N2O Emission Factor (kg/MJ)")
+        gwp_100_n2o = self._gwp100("n2o")
+        return gwp_100_n2o * self.calculate_emissions("n2o_kg_per_mj")
 
     def n2o_avoid_recycling(self):
         """
@@ -223,39 +236,31 @@ class RecyclingEmissions:
         return (0)
 
     def overall_emissions(self):
-        """kgCO2e emissions and emissions avoided per ton of waste treated."""
+        """kgCO2e emissions per ton (CH4, CO2, N2O) and BC mass tracked separately."""
+
+        ch4_e = self.ch4_emit_recycling()
+        ch4_a = self.ch4_avoid_recycling()
+        co2_e = self.co2_emit_recycling()
+        co2_a = self.co2_avoid_recycling()
+        n2o_e = self.n2o_emit_recycling()
+        n2o_a = self.n2o_avoid_recycling()
+        bc_e = self.bc_emit_recycling()
+        bc_a = self.bc_avoid_recycling()
+
+        total_emissions = ch4_e + co2_e + n2o_e
+        total_emissions_avoid = ch4_a + co2_a + n2o_a
 
         return {
-            "ch4_emissions": self.ch4_emit_recycling(),
-            "ch4_emissions_avoid": self.ch4_avoid_recycling(),
-            "co2_emissions": self.co2_emit_recycling(),
-            "co2_emissions_avoid": self.co2_avoid_recycling(),
-            "n2o_emissions": self.n2o_emit_recycling(),
-            "n2o_emissions_avoid": self.n2o_avoid_recycling(),
-            "bc_emissions": self.bc_emit_recycling(),
-            "bc_emissions_avoid": self.bc_avoid_recycling(),
-            "total_emissions": (
-                self.ch4_emit_recycling()
-                + self.co2_emit_recycling()
-                + self.n2o_emit_recycling()
-                + self.bc_emit_recycling()
-            ),
-            "total_emissions_avoid": (
-                self.ch4_avoid_recycling()
-                + self.co2_avoid_recycling()
-                + self.n2o_avoid_recycling()
-                + self.bc_avoid_recycling()
-            ),
-            "net_emissions": (
-                self.ch4_emit_recycling()
-                + self.co2_emit_recycling()
-                + self.n2o_emit_recycling()
-                + self.bc_emit_recycling()
-                - (
-                    self.ch4_avoid_recycling()
-                    + self.co2_avoid_recycling()
-                    + self.n2o_avoid_recycling()
-                    + self.bc_avoid_recycling()
-                )
-            ),
+            "ch4_emissions": ch4_e,
+            "ch4_emissions_avoid": ch4_a,
+            "co2_emissions": co2_e,
+            "co2_emissions_avoid": co2_a,
+            "n2o_emissions": n2o_e,
+            "n2o_emissions_avoid": n2o_a,
+            "bc_emissions": bc_e,
+            "bc_emissions_avoid": bc_a,
+            "total_emissions": total_emissions,
+            "total_emissions_avoid": total_emissions_avoid,
+            "net_emissions": total_emissions - total_emissions_avoid,
+            "net_emissions_bc": bc_e - bc_a,
         }

@@ -4,6 +4,10 @@ from .transportation import TransportationEmissions
 
 
 class LandfillEmissions:
+    def _gwp100(self, key: str) -> float:
+        """Return GWP100 using the exact JSON key from transportation data."""
+        gwp = self.data_trans.get("gwp_factors", {})
+        return gwp.get(key, {}).get("gwp100", 0)
     """
     A class to calculate GHG emissions (CH₄, CO₂, N₂O, BC) from landfill operations.
 
@@ -143,7 +147,7 @@ class LandfillEmissions:
         Args:
             fuel_types (list): List of fuel types used.
             fuel_consumed (list): Corresponding fuel consumption in liters per tonne waste treated.
-            factor_key (str): Key for the emission factor in the JSON file.
+            factor_key (str): Key for the emission factor in the JSON file (e.g., 'co2_kg_per_mj').
             per_waste (float): Amount of waste incinerated.
 
         Returns:
@@ -155,14 +159,14 @@ class LandfillEmissions:
             fuel_consumed = [fuel_consumed]
 
         total_emissions = 0
-        fuel_data = self.data_landfill.get("fuel_data", {})
-        available_fuels = fuel_data.get("Fuel Type", [])
+        fuel_data = self.data_landfill.get("fuel_data", [])
 
         for fuel, consumption in zip(fuel_types, fuel_consumed):
-            if fuel in available_fuels:
-                fuel_index = available_fuels.index(fuel)
-                energy_content = fuel_data["Energy Content (MJ/L)"][fuel_index]
-                emission_factor = fuel_data[factor_key][fuel_index]
+            fuel_entry = next((f for f in fuel_data if f.get("fuel_type") == fuel), None)
+            if fuel_entry is not None:
+                energy_content = fuel_entry.get("energy_content_mj_per_l", 0)
+                emission_factors = fuel_entry.get("emission_factors", {})
+                emission_factor = emission_factors.get(factor_key, 0)
                 total_emissions += consumption * energy_content * emission_factor
 
         amount_deposited = self.waste_disposed * (100 - self.waste_disposed_fired) / 100
@@ -171,19 +175,20 @@ class LandfillEmissions:
 
     def ch4_emit_landfill(self) -> float:
         """
-        Calculate CH₄ emissions (kg CO₂-eq) per ton of waste landfilled.
+        Calculate CH₄ emissions (kg CO₂-eq) per ton of waste landfilled, applying GWP100.
 
         Returns:
-            float: CH₄ emissions from fuel combustion.
+            float: CH₄ emissions from fuel combustion, as CO₂-eq.
         """
         ch4_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_types,
             self.fossil_fuel_consumed,
-            "CH4 Emission Factor (kg/MJ)",
+            "ch4_kg_per_mj",
             self.waste_disposed,
         )
-
-        return ch4_fuel_combustion
+        # Use fossil GWP for landfill fuel combustion
+        gwp_100_fossil = self._gwp100("ch4_fossil")
+        return ch4_fuel_combustion * gwp_100_fossil
 
     def ch4_avoid_landfill(self):
         """
@@ -202,19 +207,19 @@ class LandfillEmissions:
             float: CO₂ emissions from electricity and fuel combustion.
         """
         grid_emission_factor = self.data_trans.get("electricity_grid_factor", {})
-        co2_per_kwh = grid_emission_factor.get("CO2 kg-eq/kWh", 0)
+        co2_per_kwh = grid_emission_factor.get("co2_kg_per_kwh", 0)
 
         amount_deposited = self.waste_disposed * (100 - self.waste_disposed_fired) / 100
 
-        total_co2_electricity = self.grid_electricity * co2_per_kwh / amount_deposited
+        total_co2_electricity = self.grid_electricity * co2_per_kwh / amount_deposited if amount_deposited > 0 else 0
 
         co2_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_types,
             self.fossil_fuel_consumed,
-            "CO2 Emission Factor (kg/MJ)",
+            "co2_kg_per_mj",
             self.waste_disposed,
         )
-        return co2_fuel_combustion
+        return co2_fuel_combustion + total_co2_electricity
 
     def co2_avoid_landfill(self):
         """
@@ -227,19 +232,19 @@ class LandfillEmissions:
 
     def n2o_emit_landfill(self) -> float:
         """
-        Calculate N₂O emissions (kg CO₂-eq) per ton of waste landfilled.
+        Calculate N₂O emissions (kg CO₂-eq) per ton of waste landfilled, applying GWP100.
 
         Returns:
-            float: N₂O emissions from fuel combustion.
+            float: N₂O emissions from fuel combustion, as CO₂-eq.
         """
         n2o_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_types,
             self.fossil_fuel_consumed,
-            "N2O Emission Factor (kg/MJ)",
+            "n2o_kg_per_mj",
             self.waste_disposed,
         )
-
-        return n2o_fuel_combustion
+        gwp_100_n2o = self._gwp100("n2o")
+        return n2o_fuel_combustion * gwp_100_n2o
 
     def n2o_avoid_landfill(self):
         """
@@ -260,10 +265,9 @@ class LandfillEmissions:
         bc_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_types,
             self.fossil_fuel_consumed,
-            "BC Emission Factor (kg/MJ)",
+            "bc_kg_per_mj",
             self.waste_disposed,
         )
-
         return bc_fuel_combustion
 
     def bc_avoid_landfill(self):
@@ -277,43 +281,35 @@ class LandfillEmissions:
 
     def overall_emissions(self) -> dict:
         """
-        Calculate kgCO2e emissions and emissions avoided per ton of waste treated.
+        Calculate kgCO2e emissions and BC mass per ton of waste treated, matching composting.py output format.
 
         Returns:
             dict: Dictionary containing all emissions, avoided emissions, total emissions,
-                  total avoided emissions, and net emissions.
+                  total avoided emissions, and net emissions. BC is reported as mass (kg/ton).
         """
+        ch4_e = self.ch4_emit_landfill()
+        ch4_a = self.ch4_avoid_landfill()
+        co2_e = self.co2_emit_landfill()
+        co2_a = self.co2_avoid_landfill()
+        n2o_e = self.n2o_emit_landfill()
+        n2o_a = self.n2o_avoid_landfill()
+        bc_e = self.bc_emit_landfill()
+        bc_a = self.bc_avoid_landfill()
+
+        total_emissions = ch4_e + co2_e + n2o_e
+        total_emissions_avoid = ch4_a + co2_a + n2o_a
+
         return {
-            "ch4_emissions": self.ch4_emit_landfill(),
-            "ch4_emissions_avoid": self.ch4_avoid_landfill(),
-            "co2_emissions": self.co2_emit_landfill(),
-            "co2_emissions_avoid": self.co2_avoid_landfill(),
-            "n2o_emissions": self.n2o_emit_landfill(),
-            "n2o_emissions_avoid": self.n2o_avoid_landfill(),
-            "bc_emissions": self.bc_emit_landfill(),
-            "bc_emissions_avoid": self.bc_avoid_landfill(),
-            "total_emissions": (
-                self.ch4_emit_landfill()
-                + self.co2_emit_landfill()
-                + self.n2o_emit_landfill()
-                + self.bc_emit_landfill()
-            ),
-            "total_emissions_avoid": (
-                self.ch4_avoid_landfill()
-                + self.co2_avoid_landfill()
-                + self.n2o_avoid_landfill()
-                + self.bc_avoid_landfill()
-            ),
-            "net_emissions": (
-                self.ch4_emit_landfill()
-                + self.co2_emit_landfill()
-                + self.n2o_emit_landfill()
-                + self.bc_emit_landfill()
-                - (
-                    self.ch4_avoid_landfill()
-                    + self.co2_avoid_landfill()
-                    + self.n2o_avoid_landfill()
-                    + self.bc_avoid_landfill()
-                )
-            ),
+            "ch4_emissions": ch4_e,
+            "ch4_emissions_avoid": ch4_a,
+            "co2_emissions": co2_e,
+            "co2_emissions_avoid": co2_a,
+            "n2o_emissions": n2o_e,
+            "n2o_emissions_avoid": n2o_a,
+            "bc_emissions": bc_e,           # kg BC/ton
+            "bc_emissions_avoid": bc_a,     # kg BC/ton
+            "total_emissions": total_emissions,
+            "total_emissions_avoid": total_emissions_avoid,
+            "net_emissions": total_emissions - total_emissions_avoid,
+            "net_emissions_bc": bc_e - bc_a # kg BC/ton
         }

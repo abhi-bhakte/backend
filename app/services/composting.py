@@ -1,3 +1,10 @@
+"""
+NOTE:
+For CNG and coal, the energy content values in the JSON file are actually in units of MJ per kg, 
+not MJ per liter. However, for consistency, the JSON key remains "energy_content_mj_per_l". 
+Users should enter CNG and coal consumption in kg, and the code will interpret the energy 
+content accordingly for these fuels. This is to maintain database structure consistency.
+"""
 import json
 from pathlib import Path
 
@@ -272,10 +279,8 @@ class CompostingEmissions:
 
     def bc_emit_composting(self):
         """
-        Calculate black carbon (BC) emissions in kgCO2-equivalent per ton of waste treated.
+        Calculate black carbon (BC) mass in kg per ton of waste treated (not CO2e).
         """
-        # Retrieve GWP (Global Warming Potential) factor for BC
-        gwp_100_bc = self._gwp100("bc")
         
         return (
             self._calculate_emissions(
@@ -295,8 +300,6 @@ class CompostingEmissions:
         total_entry = next((x for x in ferti_list if x.get("fertilizer_type") == "total"), {})
         ferti_bc_factor = total_entry.get("bc_emission_g_per_kg", 0)
         
-        # Retrieve GWP factors for BC
-        gwp_100_bc = self._gwp100("bc")
         
         return (
             (self.compost_prod_potential / 1000)
@@ -305,41 +308,35 @@ class CompostingEmissions:
         )
 
     def overall_emissions(self):
-        """kgCO2e emissions and emissions avoided per ton of waste treated."""
+        """kgCO2e emissions per ton (CH4, CO2, N2O) and BC mass tracked separately."""
+
+        # Compute once per gas
+        ch4_e = self.ch4_emit_composting()
+        ch4_a = self.ch4_avoid_composting()
+        co2_e = self.co2_emit_composting()
+        co2_a = self.co2_avoid_composting()
+        n2o_e = self.n2o_emit_composting()
+        n2o_a = self.n2o_avoid_composting()
+        bc_e = self.bc_emit_composting()
+        bc_a = self.bc_avoid_composting()
+
+        # Totals in CO2e exclude BC mass
+        total_emissions = ch4_e + co2_e + n2o_e
+        total_emissions_avoid = ch4_a + co2_a + n2o_a
 
         return {
-            "ch4_emissions": self.ch4_emit_composting(),
-            "ch4_emissions_avoid": self.ch4_avoid_composting(),
-            "co2_emissions": self.co2_emit_composting(),
-            "co2_emissions_avoid": self.co2_avoid_composting(),
-            "n2o_emissions": self.n2o_emit_composting(),
-            "n2o_emissions_avoid": self.n2o_avoid_composting(),
-            "bc_emissions": self.bc_emit_composting(),
-            "bc_emissions_avoid": self.bc_avoid_composting(),
-            "total_emissions": (
-                self.ch4_emit_composting()
-                + self.co2_emit_composting()
-                + self.n2o_emit_composting()
-                + self.bc_emit_composting()
-            ),
-            "total_emissions_avoid": (
-                self.ch4_avoid_composting()
-                + self.co2_avoid_composting()
-                + self.n2o_avoid_composting()
-                + self.bc_avoid_composting()
-            ),
-            "net_emissions": (
-                self.ch4_emit_composting()
-                + self.co2_emit_composting()
-                + self.n2o_emit_composting()
-                + self.bc_emit_composting()
-                - (
-                    self.ch4_avoid_composting()
-                    + self.co2_avoid_composting()
-                    + self.n2o_avoid_composting()
-                    + self.bc_avoid_composting()
-                )
-            ),
+            "ch4_emissions": ch4_e,
+            "ch4_emissions_avoid": ch4_a,
+            "co2_emissions": co2_e,
+            "co2_emissions_avoid": co2_a,
+            "n2o_emissions": n2o_e,
+            "n2o_emissions_avoid": n2o_a,
+            "bc_emissions": bc_e,
+            "bc_emissions_avoid": bc_a,
+            "total_emissions": total_emissions,
+            "total_emissions_avoid": total_emissions_avoid,
+            "net_emissions": total_emissions - total_emissions_avoid,
+            "net_emissions_bc": bc_e - bc_a,
         }
 
 

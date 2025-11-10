@@ -1,6 +1,13 @@
+"""
+NOTE:
+For CNG and coal, the energy content values in the JSON file are actually in units of MJ per kg, 
+not MJ per liter. However, for consistency, the JSON key remains "energy_content_mj_per_l". 
+Users should enter CNG and coal consumption in kg, and the code will interpret the energy 
+content accordingly for these fuels. This is to maintain database structure consistency.
+"""
+
 import json
 from pathlib import Path
-from .transportation import TransportationEmissions
 
 trans_file = Path(__file__).parent.parent / "data" / "transportation.json"
 ad_file = Path(__file__).parent.parent / "data" / "ad.json"
@@ -35,17 +42,6 @@ class AnaerobicDigestionEmissions:
         """
         Initialize the Anaerobic Digestion Emissions calculator.
         """
-
-        # Debugging logs to verify received data
-        print(f"Received waste_digested: {waste_digested}")
-        print(f"Received ad_energy_product: {ad_energy_product}")
-        print(f"Received fuel_replaced: {fuel_replaced}")
-        print(f"Received compost_recovered: {compost_recovered}")
-        print(f"Received percent_compost_use_agri_garden: {percent_compost_use_agri_garden}")
-        print(f"Received electricity_consumed: {electricity_consumed}")
-        print(f"Received fuel_types_operation: {fuel_types_operation}")
-        print(f"Received fuel_consumed_operation: {fuel_consumed_operation}")
-
         self.waste_digested = waste_digested
         self.ad_energy_product = ad_energy_product
         self.fuel_replaced = fuel_replaced
@@ -64,8 +60,8 @@ class AnaerobicDigestionEmissions:
                 self.data_ad = json.load(file)
         except FileNotFoundError:
             raise FileNotFoundError(f"The file {self.ad_file} was not found.")
-        except json.JSONDecodeError:
-            raise ValueError("Error decoding JSON file. Please check the format.")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Error decoding JSON file {self.ad_file}: {e}")
         
         # Load emission factor data
         try:
@@ -73,8 +69,13 @@ class AnaerobicDigestionEmissions:
                 self.data_trans = json.load(file)
         except FileNotFoundError:
             raise FileNotFoundError(f"The file {self.trans_file} was not found.")
-        except json.JSONDecodeError:
-            raise ValueError("Error decoding JSON file. Please check the format.")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Error decoding JSON file {self.trans_file}: {e}")
+
+    @staticmethod
+    def _normalize_key(value: str) -> str:
+        """Normalize strings for key matching (lowercase, underscores)."""
+        return str(value).strip().lower().replace(" ", "_")
 
     def _calculate_emissions(self, fuel_types, fuel_consumed, factor_key, per_waste):
         """
@@ -89,24 +90,33 @@ class AnaerobicDigestionEmissions:
         Returns:
             float: Emissions per ton of waste.
         """
-        total_emissions = 0
+        total_emissions = 0.0
 
-        # Retrieve fuel data from the dataset
-        fuel_data = self.data_ad.get("fuel_data", {})
-        available_fuels = fuel_data.get("Fuel Type", [])
+        # Retrieve fuel data from the dataset (standardized list of objects)
+        fuel_data_list = self.data_ad.get("fuel_data", [])
 
         # Iterate through each fuel type and compute emissions
         for fuel, consumption in zip(fuel_types, fuel_consumed):
-            if fuel in available_fuels:
-                fuel_index = available_fuels.index(fuel)
-                energy_content = fuel_data["Energy Content (MJ/L)"][fuel_index]
-                emission_factor = fuel_data[factor_key][fuel_index]
-                
-                # Calculate emissions based on energy content and emission factor
-                total_emissions += consumption * energy_content * emission_factor
+            fuel_norm = self._normalize_key(fuel)
+
+            # Find matching fuel object
+            fuel_obj = next(
+                (f for f in fuel_data_list if self._normalize_key(f.get("fuel_type")) == fuel_norm),
+                None,
+            )
+            if not fuel_obj:
+                continue
+
+            energy_content = float(fuel_obj.get("energy_content_mj_per_l", 0) or 0)
+            emission_factor = float(
+                (fuel_obj.get("emission_factors", {}) or {}).get(factor_key, 0) or 0
+            )
+
+            # Calculate emissions based on energy content and emission factor
+            total_emissions += float(consumption or 0) * energy_content * emission_factor
 
         # Normalize emissions by waste amount, avoiding division by zero
-        return total_emissions / per_waste if per_waste > 0 else 0
+        return total_emissions / per_waste if per_waste > 0 else 0.0
     
     def ch4_emit_ad(self):
         """
@@ -120,18 +130,14 @@ class AnaerobicDigestionEmissions:
 
         # Retrieve CH₄ emission factor for biogenic leakage (IPCC default)
         ad_factors = self.data_ad.get("ad_emissions", {})
-        bio_leakage_factor = ad_factors["IPCC_default_values"]["CH4_kg_per_ton"]
+        bio_leakage_factor = (
+            ad_factors.get("ipcc_default_values", {}).get("ch4_kg_per_ton", 0) or 0
+        )
 
-        # Retrieve Global Warming Potential (GWP) values
+        # Retrieve Global Warming Potential (GWP) values (standardized keys)
         gwp_factors = self.data_trans.get("gwp_factors", {})
-
-        # Get GWP100 value for CH₄-fossil
-        ch4_fossil_index = gwp_factors["Type of gas"].index("CH4-fossil")
-        gwp_100_fossil = gwp_factors["GWP100"][ch4_fossil_index]
-
-        # Get GWP100 value for CH₄-biogenic
-        ch4_biogenic_index = gwp_factors["Type of gas"].index("CH4-biogenic")
-        gwp_100_biogenic = gwp_factors["GWP100"][ch4_biogenic_index]
+        gwp_100_fossil = (gwp_factors.get("ch4_fossil", {}) or {}).get("gwp100", 0) or 0
+        gwp_100_biogenic = (gwp_factors.get("ch4_biogenic", {}) or {}).get("gwp100", 0) or 0
 
         # Total CH₄ emissions from:
         # 1. Fossil fuel use in operations (e.g., generators, transport)
@@ -139,7 +145,7 @@ class AnaerobicDigestionEmissions:
         fossil_emissions = self._calculate_emissions(
             self.fuel_types_operation,
             self.fuel_consumed_operation,
-            'CH4 Emission Factor (kg/MJ)',
+            "ch4_kg_per_mj",
             self.waste_digested
         )
 
@@ -159,9 +165,9 @@ class AnaerobicDigestionEmissions:
         Returns:
             float: Total CO₂ emissions per ton of waste digested (kg CO₂-eq/ton).
         """
-        # Retrieve electricity grid emission factor (kg CO₂-eq per kWh)
+        # Retrieve electricity grid emission factor (kg CO₂ per kWh)
         grid_emission_factor = self.data_trans.get("electricity_grid_factor", {})
-        co2_per_kwh = grid_emission_factor.get("CO2 kg-eq/kWh", 0)
+        co2_per_kwh = grid_emission_factor.get("co2_kg_per_kwh", 0) or 0
         
         # Calculate CO₂ emissions from electricity consumption
         total_co2_electricity = self.electricity_consumed * co2_per_kwh
@@ -170,7 +176,7 @@ class AnaerobicDigestionEmissions:
         co2_from_fuel = self._calculate_emissions(
             self.fuel_types_operation,
             self.fuel_consumed_operation,
-            "CO2 Emission Factor (kg/MJ)",
+            "co2_kg_per_mj",
             self.waste_digested
         )
         
@@ -189,14 +195,13 @@ class AnaerobicDigestionEmissions:
         """
         # Retrieve Global Warming Potential (GWP) for N₂O
         gwp_factors = self.data_trans.get("gwp_factors", {})
-        n2o_index = gwp_factors["Type of gas"].index("N2O")
-        gwp_100_n2o = gwp_factors["GWP100"][n2o_index]
+        gwp_100_n2o = (gwp_factors.get("n2o", {}) or {}).get("gwp100", 0) or 0
         
         # Calculate N₂O emissions from fuel combustion and AD process
         n2o_from_fuel = self._calculate_emissions(
             self.fuel_types_operation,
             self.fuel_consumed_operation,
-            "N2O Emission Factor (kg/MJ)",
+            "n2o_kg_per_mj",
             self.waste_digested,
         )
         
@@ -207,26 +212,14 @@ class AnaerobicDigestionEmissions:
 
     def bc_emit_ad(self):
         """
-        Calculate black carbon (BC) emissions in kgCO2-equivalent per ton of waste treated.
+        Calculate black carbon (BC) mass in kg per ton of waste treated (not CO2e).
         """
-        # Retrieve GWP (Global Warming Potential) factors
-        gwp_factors = self.data_trans.get("gwp_factors", {})
-        
-        # Get the index for BC in the GWP factors list
-        bc_index = gwp_factors["Type of gas"].index("BC")
-        
-        # Retrieve the 100-year GWP value for BC
-        gwp_100_bc = gwp_factors["GWP100"][bc_index]
-
-        
-        return (
-            gwp_100_bc
-            * self._calculate_emissions(
-                self.fuel_types_operation,
-                self.fuel_consumed_operation,
-                "BC Emissions (kg/MJ)",
-                self.waste_digested,
-            )
+        # Direct mass of BC from fuel combustion (kg), no GWP conversion
+        return self._calculate_emissions(
+            self.fuel_types_operation,
+            self.fuel_consumed_operation,
+            "bc_kg_per_mj",
+            self.waste_digested,
         )
 
     def bc_avoid_ad(self):
@@ -235,38 +228,31 @@ class AnaerobicDigestionEmissions:
 
     def overall_emissions(self):
         """kgCO2e emissions and emissions avoided per ton of waste digested."""
+        ch4_e = self.ch4_emit_ad()
+        co2_e = self.co2_emit_ad()
+        n2o_e = self.n2o_emit_ad()
+        bc_e = self.bc_emit_ad()
+
+        ch4_a = self.ch4_avoid_ad()
+        co2_a = self.co2_avoid_ad()
+        n2o_a = self.n2o_avoid_ad()
+        bc_a = self.bc_avoid_ad()
+
+        # Totals are in CO2e and should exclude BC mass (tracked separately)
+        total_emissions = ch4_e + co2_e + n2o_e
+        total_emissions_avoid = ch4_a + co2_a + n2o_a
 
         return {
-            "ch4_emissions": self.ch4_emit_ad(),
-            "ch4_emissions_avoid": self.ch4_avoid_ad(),
-            "co2_emissions": self.co2_emit_ad(),
-            "co2_emissions_avoid": self.co2_avoid_ad(),
-            "n2o_emissions": self.n2o_emit_ad(),
-            "n2o_emissions_avoid": self.n2o_avoid_ad(),
-            "bc_emissions": self.bc_emit_ad(),
-            "bc_emissions_avoid": self.bc_avoid_ad(),
-            "total_emissions": (
-                self.ch4_emit_ad()
-                + self.co2_emit_ad()
-                + self.n2o_emit_ad()
-                + self.bc_emit_ad()
-            ),
-            "total_emissions_avoid": (
-                self.ch4_avoid_ad()
-                + self.co2_avoid_ad()
-                + self.n2o_avoid_ad()
-                + self.bc_avoid_ad()
-            ),
-            "net_emissions": (
-                self.ch4_emit_ad()
-                + self.co2_emit_ad()
-                + self.n2o_emit_ad()
-                + self.bc_emit_ad()
-                - (
-                    self.ch4_avoid_ad()
-                    + self.co2_avoid_ad()
-                    + self.n2o_avoid_ad()
-                    + self.bc_avoid_ad()
-                )
-            ),
+            "ch4_emissions": ch4_e,
+            "ch4_emissions_avoid": ch4_a,
+            "co2_emissions": co2_e,
+            "co2_emissions_avoid": co2_a,
+            "n2o_emissions": n2o_e,
+            "n2o_emissions_avoid": n2o_a,
+            "bc_emissions": bc_e,
+            "bc_emissions_avoid": bc_a,
+            "total_emissions": total_emissions,
+            "total_emissions_avoid": total_emissions_avoid,
+            "net_emissions": total_emissions - total_emissions_avoid,
+            "net_emissions_bc": bc_e - bc_a,
         }
