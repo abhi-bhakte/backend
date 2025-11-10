@@ -11,11 +11,10 @@ class TransportationFuelUse(BaseModel):
 class TransferStationEnergyUse(BaseModel):
     waste_handled_tpd: float = Field(..., description="Waste handled at transfer station (tonnes/day)")
     electricity_kwh_per_day: float = Field(..., description="Electricity used (kWh/day)")
-    fossil_fuels: TransportationFuelUse = Field(..., description="Fossil fuels used at transfer station")
+    fuel_consumption: TransportationFuelUse = Field(..., description="Fuel consumption at transfer station")
 
 class TransportationData(BaseModel):
-    vehicle_type: str = Field(..., description="Vehicle type used")
-    vehicle_fuels: TransportationFuelUse = Field(..., description="Fuel consumption for collection/transportation")
+    waste_collection: dict = Field(..., description="Waste collection data including vehicle type and fuel consumption")
     transfer_station: Optional[TransferStationEnergyUse] = Field(
         None, description="Energy and fuel use at transfer station"
     )

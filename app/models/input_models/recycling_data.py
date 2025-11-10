@@ -4,32 +4,15 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 
-class MaterialCollectionData(BaseModel):
-    paper_cardboard: Optional[float] = Field(None, ge=0, le=100, description="Percentage of paper & cardboard collected")
-    plastic: Optional[float] = Field(None, ge=0, le=100, description="Percentage of plastic collected")
-    aluminum: Optional[float] = Field(None, ge=0, le=100, description="Percentage of aluminum collected")
-    metal_steel: Optional[float] = Field(None, ge=0, le=100, description="Percentage of metal/steel collected")
-    glass: Optional[float] = Field(None, ge=0, le=100, description="Percentage of glass collected")
 
-
-class MaterialEnergyData(BaseModel):
-    electricity_kwh_per_tonne: Optional[float] = Field(None, description="Electricity used for recycling (kWh/tonne)")
-    petrol_l_per_day: Optional[float] = Field(None, description="Petrol used (L/day)")
-    diesel_l_per_day: Optional[float] = Field(None, description="Diesel used (L/day)")
-    cng_l_per_day: Optional[float] = Field(None, description="CNG used (L/day)")
-    coal_kg_per_day: Optional[float] = Field(None, description="Coal used (kg/day)")
-    recyclability_percent: Optional[float] = Field(None, ge=0, le=100, description="Recyclability (%)")
-
-
-class RecyclingEnergyConsumption(BaseModel):
-    paper_cardboard: Optional[MaterialEnergyData]
-    plastic: Optional[MaterialEnergyData]
-    aluminum: Optional[MaterialEnergyData]
-    metal_steel: Optional[MaterialEnergyData]
-    glass: Optional[MaterialEnergyData]
-
+# New RecyclingData model matching the API payload (RecyclingRequest)
+from typing import Dict
 
 class RecyclingData(BaseModel):
-    formal_sector: Optional[MaterialCollectionData] = Field(None, description="Recyclables collected by the formal sector")
-    informal_sector: Optional[MaterialCollectionData] = Field(None, description="Recyclables collected by the informal sector")
-    energy_consumption: Optional[RecyclingEnergyConsumption] = Field(None, description="Energy use and recyclability for each material")
+    recycle_collected_formal: float = Field(..., gt=0, description="Total recyclable collected by the formal sector (tons)")
+    recycle_collected_informal: float = Field(..., ge=0, description="Total recyclable collected by the informal sector (tons)")
+    material_composition_formal: Dict[str, float] = Field(..., description="Composition (%) of materials collected by the formal sector")
+    material_composition_informal: Dict[str, float] = Field(..., description="Composition (%) of materials collected by the informal sector")
+    electricity_consumed: Dict[str, float] = Field(..., description="Electricity consumed during recycling for each material (kWh)")
+    fuel_consumption: Dict[str, Dict[str, float]] = Field(..., description="Fuel consumption for each material and fuel type (liters)")
+    recyclability: Dict[str, float] = Field(..., description="Recyclability of materials (percentage)")

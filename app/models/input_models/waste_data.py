@@ -32,28 +32,31 @@ class WasteAllocation(BaseModel):
     incineration: float = Field(..., description="Waste allocated for incineration (tonnes/day)")
     landfilling: float = Field(..., description="Waste allocated for landfilling (tonnes/day)")
 
-class WasteData(BaseModel):
-    submission_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique submission ID")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Submission timestamp")
-    user_id: str = Field(..., description="User ID (required, linked to logged-in user)")
-    scenario_name: Optional[str] = Field(None, description="Scenario name or tag (e.g., Summer2024 Plan)")
 
+# New nested general block
+class GeneralBlock(BaseModel):
     city_name: str = Field(..., description="City name")
     date: str = Field(..., description="Date of waste data entry (YYYY-MM-DD)")
-    population: int = Field(..., description="City population")
     total_waste_generation: float = Field(..., description="Total waste generation (tonnes/day)")
     formally_collected: float = Field(..., description="Formally collected waste (tonnes/day)")
     informally_collected: float = Field(..., description="Informally collected waste (tonnes/day)")
     uncollected: Optional[float] = Field(None, description="Uncollected waste (auto-calculated if not provided)")
-
-    selected_categories: List[str] = Field(
+    dry_waste_percentage: Optional[float] = Field(None, description="Dry waste percentage")
+    mixed_waste_percentage: Optional[float] = Field(None, description="Mixed waste percentage")
+    wet_waste_percentage: Optional[float] = Field(None, description="Wet waste percentage")
+    selected_treatment_methods: List[str] = Field(
         ..., 
-        description="List of selected waste categories. Options: composting, anaerobic, recycling, incineration, landfilling"
+        description="List of selected waste treatment methods. Options: composting, anaerobic_digestion, recycling, incineration, landfilling"
     )
-
-    waste_composition: WasteComposition = Field(..., description="Waste composition as percentage by weight")
     waste_allocation: WasteAllocation = Field(..., description="Waste allocation for each category (tonnes/day)")
+    waste_composition: WasteComposition = Field(..., description="Waste composition as percentage by weight")
 
+class WasteData(BaseModel):
+    submission_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique submission ID")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Submission timestamp")
+    user_id: Optional[str] = Field(None, description="User ID (set from logged-in user)")
+    scenario_name: str = Field(..., description="Scenario name or tag (e.g., Summer2024 Plan)")
+    general: GeneralBlock = Field(..., description="General city and waste data block")
     transportation: Optional[TransportationData] = Field(None, description="Transportation data block")
     composting: Optional[CompostingData] = Field(None, description="Composting data block")
     anaerobic_digestion: Optional[AnaerobicDigestionData] = Field(None, description="Anaerobic Digestion data block")
