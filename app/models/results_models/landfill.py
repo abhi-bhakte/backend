@@ -54,11 +54,12 @@ class LandfillResponse(BaseModel):
         co2_emissions_avoid (float): CO₂ emissions avoided due to landfill gas recovery (kgCO₂e/ton waste disposed).
         n2o_emissions (float): N₂O emissions from landfill (kgCO₂e/ton waste disposed).
         n2o_emissions_avoid (float): N₂O emissions avoided due to landfill gas recovery (kgCO₂e/ton waste disposed).
-        bc_emissions (float): Black Carbon emissions from landfill (kgCO₂e/ton waste disposed).
-        bc_emissions_avoid (float): Black Carbon emissions avoided due to landfill gas recovery (kgCO₂e/ton waste disposed).
+        bc_emissions (float): Black Carbon emissions from landfill (kg/ton waste disposed).
+        bc_emissions_avoid (float): Black Carbon emissions avoided due to landfill gas recovery (kg/ton waste disposed).
         total_emissions (float): Total CO₂-equivalent emissions from landfill (kgCO₂e/ton waste disposed).
         total_emissions_avoid (float): Total CO₂-equivalent emissions avoided due to landfill gas recovery (kgCO₂e/ton waste disposed).
         net_emissions (float): Net emissions from landfill (kgCO₂e/ton waste disposed).
+        net_emissions_bc (float): Net Black Carbon emissions (kg/ton waste disposed).
     """
 
     ch4_emissions: float  # CH₄ emissions from landfill (kgCO₂e/ton waste disposed)
@@ -67,8 +68,9 @@ class LandfillResponse(BaseModel):
     co2_emissions_avoid: float  # CO₂ emissions avoided due to landfill gas recovery (kgCO₂e/ton waste disposed)
     n2o_emissions: float  # N₂O emissions from landfill (kgCO₂e/ton waste disposed)
     n2o_emissions_avoid: float  # N₂O emissions avoided due to landfill gas recovery (kgCO₂e/ton waste disposed)
-    bc_emissions: float  # Black Carbon emissions from landfill (kgCO₂e/ton waste disposed)
-    bc_emissions_avoid: float  # Black Carbon emissions avoided due to landfill gas recovery (kgCO₂e/ton waste disposed)
+    bc_emissions: float  # Black Carbon emissions from landfill (kg/ton waste disposed)
+    bc_emissions_avoid: float  # Black Carbon emissions avoided due to landfill gas recovery (kg/ton waste disposed)
     total_emissions: float  # Total CO₂-equivalent emissions from landfill (kgCO₂e/ton waste disposed)
     total_emissions_avoid: float  # Total CO₂-equivalent emissions avoided due to landfill gas recovery (kgCO₂e/ton waste disposed)
     net_emissions: float  # Net emissions from landfill (kgCO₂e/ton waste disposed)
+    net_emissions_bc: float  # Net Black Carbon emissions (kg/ton waste disposed)

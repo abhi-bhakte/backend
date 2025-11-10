@@ -22,9 +22,7 @@ class RecyclingRequest(BaseModel):
     material_composition_formal: Dict[str, float] = Field(..., description="Composition (%) of materials collected by the formal sector")
     material_composition_informal: Dict[str, float] = Field(..., description="Composition (%) of materials collected by the informal sector")
     electricity_consumed: Dict[str, float] = Field(..., description="Electricity consumed during recycling for each material (kWh)")
-    coal_consumed: Dict[str, float] = Field(..., description="Coal consumed during recycling for each material (kg)")
-    fuel_types_operation: Dict[str, List[str]] = Field(..., description="Types of fuel used in recycling operations for each material")
-    fuel_consumed_operation: Dict[str, List[float]] = Field(..., description="Fuel consumption in liters for each material")
+    fuel_consumption: Dict[str, Dict[str, float]] = Field(..., description="Fuel consumption for each material and fuel type (liters)")
     recyclability: Dict[str, float] = Field(..., description="Recyclability of materials (percentage)")
 
 
@@ -39,11 +37,12 @@ class RecyclingResponse(BaseModel):
         co2_emissions_avoid (float): CO2 emissions avoided due to recycling (kgCO2e/ton waste recycled).
         n2o_emissions (float): N2O emissions from recycling (kgCO2e/ton waste recycled).
         n2o_emissions_avoid (float): N2O emissions avoided due to recycling (kgCO2e/ton waste recycled).
-        bc_emissions (float): Black Carbon emissions from recycling (kgCO2e/ton waste recycled).
-        bc_emissions_avoid (float): Black Carbon emissions avoided due to recycling (kgCO2e/ton waste recycled).
+        bc_emissions (float): Black Carbon emissions from recycling (kg/ton waste recycled, NOT CO2e).
+        bc_emissions_avoid (float): Black Carbon emissions avoided due to recycling (kg/ton waste recycled, NOT CO2e).
         total_emissions (float): Total CO2-equivalent emissions from recycling (kgCO2e/ton waste recycled).
         total_emissions_avoid (float): Total CO2-equivalent emissions avoided due to recycling (kgCO2e/ton waste recycled).
         net_emissions (float): Net emissions from recycling (kgCO2e/ton waste recycled).
+        net_emissions_bc (float): Net Black Carbon emissions (kg/ton waste recycled, NOT CO2e).
     """
     ch4_emissions: float
     ch4_emissions_avoid: float
@@ -51,8 +50,9 @@ class RecyclingResponse(BaseModel):
     co2_emissions_avoid: float
     n2o_emissions: float
     n2o_emissions_avoid: float
-    bc_emissions: float
-    bc_emissions_avoid: float
+    bc_emissions: float  
+    bc_emissions_avoid: float 
     total_emissions: float
     total_emissions_avoid: float
     net_emissions: float
+    net_emissions_bc: float  
