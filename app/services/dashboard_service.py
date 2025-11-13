@@ -16,6 +16,7 @@ def parse_date(date_str):
 async def get_city_summary_service(city_name, start_date, end_date, db):
     # ...existing code...
 
+
     try:
         start_dt = parse_date(start_date)
         end_dt = parse_date(end_date)
@@ -28,9 +29,55 @@ async def get_city_summary_service(city_name, start_date, end_date, db):
         date_list.append(current_dt.strftime("%Y-%m-%d"))
         current_dt += timedelta(days=1)
 
+    # --- Daily time series extraction for last 15 days ---
+    daily_stats = []
+    # Aggregate stats by date
+    stats_by_date = {}
+    for date_str in date_list:
+        day_query = {
+            "scenario.general.city_name": {"$regex": f"^{city_name}$", "$options": "i"},
+            "scenario.general.date": date_str
+        }
+        day_cursor = db[COLLECTION_NAME].find(day_query, {"_id": 0})
+        async for doc in day_cursor:
+            scenario = doc.get("scenario", {})
+            general = scenario.get("general", {})
+            date_val = general.get("date", date_str)
+            collected_val = general.get("formally_collected", 0)
+            emissions = doc.get("emissions", {})
+            method_emissions = {}
+            for method, method_obj in emissions.items():
+                if isinstance(method_obj, dict):
+                    total = 0
+                    for gas in ["co2", "ch4", "n2o", "bc"]:
+                        value = method_obj.get(gas, 0)
+                        if isinstance(value, str):
+                            try:
+                                value = float(value)
+                            except ValueError:
+                                value = 0
+                        if isinstance(value, (int, float)):
+                            total += value
+                    method_emissions[method] = round(total, 2)
+            total_emissions = sum(method_emissions.values())
+            if date_val not in stats_by_date:
+                stats_by_date[date_val] = {
+                    "date": date_val,
+                    "collected": 0,
+                    "emissions": 0,
+                    "emissions_by_method": {}
+                }
+            stats_by_date[date_val]["collected"] += round(collected_val, 2)
+            stats_by_date[date_val]["emissions"] += round(total_emissions, 2)
+            # Sum emissions by method
+            for method, value in method_emissions.items():
+                stats_by_date[date_val]["emissions_by_method"][method] = stats_by_date[date_val]["emissions_by_method"].get(method, 0) + value
+    daily_stats = list(stats_by_date.values())
+
+    # Case-insensitive city name matching using regex in query
     query = {
-        "scenario.city_name": city_name,
-        "scenario.date": {"$in": date_list}
+        "scenario.general.city_name": {"$regex": f"^{city_name}$", "$options": "i"},
+        "scenario.general.date": {"$in": date_list}
     }
     cursor = db[COLLECTION_NAME].find(query, {"_id": 0})
     formally_collected_cumulative = 0
@@ -41,7 +88,7 @@ async def get_city_summary_service(city_name, start_date, end_date, db):
     wet_percent_sum = 0
     mixed_percent_sum = 0
     percent_days_count = 0
-    treatment_methods = ["composting", "anaerobic_digestion", "recycling", "incineration"]
+    treatment_methods = ["composting", "anaerobic_digestion", "recycling", "incineration", "landfilling"]
     ghg_methods = [
         "Composting",
         "Anaerobic Digestion",
@@ -55,9 +102,10 @@ async def get_city_summary_service(city_name, start_date, end_date, db):
 
     async for doc in cursor:
         scenario = doc.get("scenario", {})
-        formally_collected = scenario.get("formally_collected", 0)
-        informally_collected = scenario.get("informally_collected", 0)
-        uncollected = scenario.get("uncollected", 0)
+        general = scenario.get("general", {})
+        formally_collected = general.get("formally_collected", 0)
+        informally_collected = general.get("informally_collected", 0)
+        uncollected = general.get("uncollected", 0)
         if isinstance(formally_collected, (int, float)):
             formally_collected_cumulative += formally_collected
         if isinstance(informally_collected, (int, float)):
@@ -65,23 +113,23 @@ async def get_city_summary_service(city_name, start_date, end_date, db):
         if isinstance(uncollected, (int, float)):
             uncollected_cumulative += uncollected
 
-        dry_percent = scenario.get("dry_waste_percentage", None)
-        wet_percent = scenario.get("wet_waste_percentage", None)
-        mixed_percent = scenario.get("mixed_waste_percentage", None)
+        dry_percent = general.get("dry_waste_percentage", None)
+        wet_percent = general.get("wet_waste_percentage", None)
+        mixed_percent = general.get("mixed_waste_percentage", None)
         if all(isinstance(x, (int, float)) for x in [dry_percent, wet_percent, mixed_percent]):
             dry_percent_sum += dry_percent
             wet_percent_sum += wet_percent
             mixed_percent_sum += mixed_percent
             percent_days_count += 1
 
-        waste_composition = scenario.get("waste_composition", {})
+        waste_composition = general.get("waste_composition", {})
         if isinstance(waste_composition, dict) and waste_composition:
             for k, v in waste_composition.items():
                 if isinstance(v, (int, float)):
                     composition_sums[k] = composition_sums.get(k, 0) + v
             composition_days_count += 1
 
-        waste_allocation = scenario.get("waste_allocation", {})
+        waste_allocation = general.get("waste_allocation", {})
         diverted_sum = 0
         for method in treatment_methods:
             value = waste_allocation.get(method, 0)
@@ -102,7 +150,6 @@ async def get_city_summary_service(city_name, start_date, end_date, db):
                 if isinstance(value, (int, float)):
                     ghg_emission_cumulative[gas] += value
 
-
     ghg_emissions_cumulative = round(sum(ghg_emission_cumulative.values()), 2)
     dry_percent_cumulative = round(dry_percent_sum / percent_days_count, 2) if percent_days_count else None
     wet_percent_cumulative = round(wet_percent_sum / percent_days_count, 2) if percent_days_count else None
@@ -112,17 +159,18 @@ async def get_city_summary_service(city_name, start_date, end_date, db):
     else:
         composition_cumulative = None
 
-
     # --- Material Recovery Calculation for Recycling ---
     # Use material_composition_formal and material_composition_informal from each document
     recovery_materials = ["paper", "plastic", "aluminum", "metal", "glass"]
     material_recovery_cumulative = {m: 0.0 for m in recovery_materials}
-    cursor3 = db[COLLECTION_NAME].find(query, {"_id": 0, "scenario.recycling": 1, "scenario.formally_collected": 1, "scenario.informally_collected": 1})
+    # Use same query for material recovery (case-insensitive city name)
+    cursor3 = db[COLLECTION_NAME].find(query, {"_id": 0, "scenario.recycling": 1, "scenario.general.formally_collected": 1, "scenario.general.informally_collected": 1})
     async for doc in cursor3:
         scenario = doc.get("scenario", {})
+        general = scenario.get("general", {})
         recycling = scenario.get("recycling", {})
-        formally_collected = scenario.get("formally_collected", 0)
-        informally_collected = scenario.get("informally_collected", 0)
+        formally_collected = general.get("formally_collected", 0)
+        informally_collected = general.get("informally_collected", 0)
         material_comp_formal = recycling.get("material_composition_formal", {})
         material_comp_informal = recycling.get("material_composition_informal", {})
         recyc_obj = recycling.get("recyclability", {})
@@ -133,7 +181,6 @@ async def get_city_summary_service(city_name, start_date, end_date, db):
             # Calculate recovered for this doc
             recovered = formally_collected * (comp_formal / 100) * (recyc / 100) + informally_collected * (comp_informal / 100) * (recyc / 100)
             material_recovery_cumulative[material] += recovered
-    # Round results
     material_recovery_cumulative = {m: round(v, 2) for m, v in material_recovery_cumulative.items()}
 
     return {
@@ -149,5 +196,6 @@ async def get_city_summary_service(city_name, start_date, end_date, db):
         "wet_percent_cumulative": wet_percent_cumulative,
         "mixed_percent_cumulative": mixed_percent_cumulative,
         "composition_cumulative": composition_cumulative,
-        "material_recovery_cumulative": material_recovery_cumulative
+        "material_recovery_cumulative": material_recovery_cumulative,
+        "daily_stats": daily_stats
     }

@@ -1,6 +1,13 @@
 from pydantic import BaseModel
 from typing import Optional, Dict
 
+from typing import List
+
+class DailyStat(BaseModel):
+    date: str
+    collected: float
+    emissions: float
+
 class CitySummaryResponse(BaseModel):
     city_name: str
     start_date: str
@@ -15,3 +22,4 @@ class CitySummaryResponse(BaseModel):
     mixed_percent_cumulative: Optional[float]
     composition_cumulative: Optional[Dict[str, float]]
     material_recovery_cumulative: Optional[Dict[str, float]]
+    daily_stats: Optional[List[DailyStat]]
