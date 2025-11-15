@@ -1,7 +1,7 @@
 {
     "composting_emissions": {
         "ipcc_default_values": {
-            "ch4_kg_per_ton": 4,
+            "ch4_kg_per_ton": 0.88,
             "n2o_kg_per_ton": 0.3
         }
     },
