@@ -1,9 +1,40 @@
 import json
+import math
 from pathlib import Path
 from .transportation import TransportationEmissions
 
 
 class LandfillEmissions:
+    # Landfill operational condition factors (default values; could be moved to JSON later)
+    _LANDFILL_PROPERTIES = {
+        'sanitary_without_gas': {'mcf': 1.0, 'ox': 0.1},
+        'sanitary_with_gas': {'mcf': 1.0, 'ox': 0.1},
+        'managed_semi_aerobic': {'mcf': 0.5, 'ox': 0.0},
+        'open_dumping_deep': {'mcf': 0.8, 'ox': 0.0},
+        'open_dumping_shallow': {'mcf': 0.4, 'ox': 0.0},
+        'uncategorized': {'mcf': 0.6, 'ox': 0.0},
+    }
+
+    # Waste properties with DOC fraction, composition (% of total), and first-order decay rate constant k
+    _WASTE_PROPERTIES = {
+        'food': {'doc': 0.152, 'composition': 40.30,'rate_constant': 0.4},
+        'garden': {'doc': 0.196, 'composition': 0.0, 'rate_constant': 0.17},
+        'plastic': {'doc': 0.0, 'composition': 6.4, 'rate_constant': 0.0},
+        'paper': {'doc': 0.41, 'composition': 11.30, 'rate_constant': 0.07},
+        'textile': {'doc': 0.32, 'composition': 2.5, 'rate_constant': 0.07},
+        'rubber': {'doc': 0.45024, 'composition': 0.8, 'rate_constant': 0.035},
+        'glass': {'doc': 0.0, 'composition': 3.5, 'rate_constant': 0.0},
+        'metal': {'doc': 0.0, 'composition': 3.8, 'rate_constant': 0.0},
+        'nappies': {'doc': 0.252, 'composition': 0.0, 'rate_constant': 0.17},
+        'wood': {'doc': 0.425, 'composition': 7.9, 'rate_constant': 0.035},
+        'hazardous': {'doc': 0.0, 'composition': 0.0, 'rate_constant': 0.0},
+        'others': {'doc': 0.0, 'composition': 21.9, 'rate_constant': 0.0},
+    }
+
+    # Default constants
+    _DOCF = 0.5  # Fraction of DOC decomposing under anaerobic conditions
+    _F_CH4 = 0.5  # Fraction of CH4 in landfill gas
+
     def _gwp100(self, key: str) -> float:
         """Return GWP100 using the exact JSON key from transportation data."""
         gwp = self.data_trans.get("gwp_factors", {})
@@ -172,23 +203,114 @@ class LandfillEmissions:
         amount_deposited = self.waste_disposed * (100 - self.waste_disposed_fired) / 100
 
         return total_emissions / amount_deposited if amount_deposited > 0 else 0
+    
+    def _biogenic_ch4_mass_per_ton(self) -> float:
+        """Return biogenic CH₄ mass (kg CH₄ per ton waste) using first-order decay.
+
+        This mirrors prior biogenic computation but returns mass, leaving CO₂-eq
+        conversion to the caller.
+        """
+        # Amount of waste actually landfilled (excluding open burning)
+        waste_burned_pct = self.waste_disposed_fired  # treated as percent
+        waste_deposited = self.waste_disposed
+        landfill_waste_daily_gg = waste_deposited * (100 - waste_burned_pct) * 0.01 * 0.001  # Gg/day
+
+        props = self._LANDFILL_PROPERTIES.get(
+            self.landfill_type,
+            self._LANDFILL_PROPERTIES['uncategorized'],
+        )
+        mcf = props['mcf']
+        ox = props['ox']
+
+        # Growth adjusted initial annual waste (Gg/year)
+        w0 = (landfill_waste_daily_gg * 365) / (1 + 0.01 * self.annual_growth_rate) ** (
+            self.current_year - self.start_year
+        )
+        initial_deposit = w0
+
+        # Weighted average DOC from composition
+        weighted_doc = 0.0
+        for name, vals in self._WASTE_PROPERTIES.items():
+            weighted_doc += (vals['composition'] / 100.0) * vals['doc']
+
+        # Weighted decay rate constant k
+        k_weighted = 0.0
+        for name, vals in self._WASTE_PROPERTIES.items():
+            k_weighted += (vals['composition'] / 100.0) * vals['rate_constant']
+
+        exp_decay = math.exp(-k_weighted)
+
+        # Initialize tracking variables
+        total_waste_deposited = 0.0
+        total_ch4_generated = 0.0
+        h_last = w0 * weighted_doc * self._DOCF * mcf  # initial DDOCm accumulated
+
+        for i in range(1, 101):  # 100-year horizon
+            year = self.start_year + i
+            if year > self.end_year:
+                w = 0.0
+            elif year == self.current_year:
+                w = 365 * landfill_waste_daily_gg
+            else:
+                w = w0 * (1 + 0.01 * self.annual_growth_rate)
+            w0 = w
+
+            # Decomposable DOC deposited (DDOCm)
+            d = w * weighted_doc * self._DOCF * mcf
+            # Assume immediate fraction reacting (simplified: all new deposit subject to future decay)
+            # Accumulated at end of year
+            h = (d) + h_last * exp_decay
+            # DDOCm decomposed during year
+            e = (h_last * (1 - exp_decay))
+            # CH4 generated (Gg CH4)
+            ch4_year = e * self._F_CH4 * 16 / 12
+            total_ch4_generated += ch4_year
+            total_waste_deposited += w
+            h_last = h
+
+        total_waste_deposited += initial_deposit
+
+        # Oxidation adjustment (fugitive share)
+        ch4_fugitive = total_ch4_generated * (1 - ox)  # Gg CH4
+        # Convert Gg CH4 to kg CH4 per ton waste: 1 Gg = 1e9 g = 1e6 kg
+        kg_ch4_total = ch4_fugitive * 1_000_000.0
+        # total waste deposited (w) was in Gg/year, convert to tonnes: 1 Gg = 1e6 kg = 1000 tonnes
+        tonnes_waste = total_waste_deposited * 1000.0
+        kg_ch4_per_ton = kg_ch4_total / tonnes_waste if tonnes_waste > 0 else 0.0
+
+        return kg_ch4_per_ton
 
     def ch4_emit_landfill(self) -> float:
-        """
-        Calculate CH₄ emissions (kg CO₂-eq) per ton of waste landfilled, applying GWP100.
+        """Calculate total CH₄ emissions (kg CO₂-eq) per ton of waste landfilled.
+
+        Combines fossil CH₄ from fuel combustion and biogenic CH₄ from waste
+        degradation. Each component is converted to CO₂-eq with its respective
+        GWP100 factor, then summed.
 
         Returns:
-            float: CH₄ emissions from fuel combustion, as CO₂-eq.
+            float: Total CH₄ emissions (CO₂-eq) per ton of waste.
         """
-        ch4_fuel_combustion = self._calculate_emissions(
+        # Fossil CH4 from fuel combustion (kg CH4 per ton converted to CO2-eq)
+        ch4_fossil_mass = self._calculate_emissions(
             self.fossil_fuel_types,
             self.fossil_fuel_consumed,
             "ch4_kg_per_mj",
             self.waste_disposed,
         )
-        # Use fossil GWP for landfill fuel combustion
         gwp_100_fossil = self._gwp100("ch4_fossil")
-        return ch4_fuel_combustion * gwp_100_fossil
+        ch4_fossil_co2e = ch4_fossil_mass * gwp_100_fossil
+
+        # Biogenic CH4 (already returned as kg CH4 per ton); convert using biogenic GWP
+        ch4_biogenic_mass = self._biogenic_ch4_mass_per_ton()
+        gwp_100_biogenic = self._gwp100("ch4_biogenic")
+        ch4_biogenic_co2e = ch4_biogenic_mass * gwp_100_biogenic
+
+        # Store breakdown for later reporting
+        self._last_ch4_fossil = ch4_fossil_co2e
+        self._last_ch4_biogenic = ch4_biogenic_co2e
+
+        return ch4_fossil_co2e + ch4_biogenic_co2e
+
 
     def ch4_avoid_landfill(self):
         """
@@ -287,8 +409,11 @@ class LandfillEmissions:
             dict: Dictionary containing all emissions, avoided emissions, total emissions,
                   total avoided emissions, and net emissions. BC is reported as mass (kg/ton).
         """
-        ch4_e = self.ch4_emit_landfill()
+        ch4_total = self.ch4_emit_landfill()
         ch4_a = self.ch4_avoid_landfill()
+        # Retrieve breakdown from last calculation (fallback to 0 if missing)
+        ch4_fossil = getattr(self, "_last_ch4_fossil", 0.0)
+        ch4_biogenic = getattr(self, "_last_ch4_biogenic", 0.0)
         co2_e = self.co2_emit_landfill()
         co2_a = self.co2_avoid_landfill()
         n2o_e = self.n2o_emit_landfill()
@@ -296,11 +421,13 @@ class LandfillEmissions:
         bc_e = self.bc_emit_landfill()
         bc_a = self.bc_avoid_landfill()
 
-        total_emissions = ch4_e + co2_e + n2o_e
+        total_emissions = ch4_total + co2_e + n2o_e
         total_emissions_avoid = ch4_a + co2_a + n2o_a
 
         return {
-            "ch4_emissions": ch4_e,
+            "ch4_emissions": ch4_total,
+            "ch4_emissions_fossil": ch4_fossil,
+            "ch4_emissions_biogenic": ch4_biogenic,
             "ch4_emissions_avoid": ch4_a,
             "co2_emissions": co2_e,
             "co2_emissions_avoid": co2_a,
