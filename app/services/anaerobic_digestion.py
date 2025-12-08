@@ -227,7 +227,7 @@ class AnaerobicDigestionEmissions:
         return 0
 
     def overall_emissions(self):
-        """kgCO2e emissions and emissions avoided per ton of waste digested."""
+        """kgCO2e emissions and emissions avoided per ton of waste digested, plus total (kgCO2e) outputs."""
         ch4_e = self.ch4_emit_ad()
         co2_e = self.co2_emit_ad()
         n2o_e = self.n2o_emit_ad()
@@ -241,7 +241,11 @@ class AnaerobicDigestionEmissions:
         # Totals are in CO2e and should exclude BC mass (tracked separately)
         total_emissions = ch4_e + co2_e + n2o_e
         total_emissions_avoid = ch4_a + co2_a + n2o_a
+        net_emissions = total_emissions - total_emissions_avoid
+        net_emissions_bc = bc_e - bc_a
 
+        # Total outputs (kgCO2e, not per tonne)
+        multiplier = self.waste_digested if self.waste_digested > 0 else 1
         return {
             "ch4_emissions": ch4_e,
             "ch4_emissions_avoid": ch4_a,
@@ -253,6 +257,20 @@ class AnaerobicDigestionEmissions:
             "bc_emissions_avoid": bc_a,
             "total_emissions": total_emissions,
             "total_emissions_avoid": total_emissions_avoid,
-            "net_emissions": total_emissions - total_emissions_avoid,
-            "net_emissions_bc": bc_e - bc_a,
+            "net_emissions": net_emissions,
+            "net_emissions_bc": net_emissions_bc,
+
+            # New total outputs (kgCO2e, not per tonne)
+            "ch4_emissions_total": ch4_e * multiplier,
+            "ch4_emissions_avoid_total": ch4_a * multiplier,
+            "co2_emissions_total": co2_e * multiplier,
+            "co2_emissions_avoid_total": co2_a * multiplier,
+            "n2o_emissions_total": n2o_e * multiplier,
+            "n2o_emissions_avoid_total": n2o_a * multiplier,
+            "bc_emissions_total": bc_e * multiplier,
+            "bc_emissions_avoid_total": bc_a * multiplier,
+            "total_emissions_total": total_emissions * multiplier,
+            "total_emissions_avoid_total": total_emissions_avoid * multiplier,
+            "net_emissions_total": net_emissions * multiplier,
+            "net_emissions_bc_total": net_emissions_bc * multiplier,
         }

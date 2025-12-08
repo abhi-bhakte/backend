@@ -1,6 +1,7 @@
 import json
 import math
 from pathlib import Path
+from typing import Optional, Dict
 from .transportation import TransportationEmissions
 
 
@@ -79,6 +80,7 @@ class LandfillEmissions:
         gas_recovery_start_year: int = None,
         gas_recovery_end_year: int = None,
         replaced_fossil_fuel_type: str = None,
+        mix_waste_composition: Optional[Dict[str, float]] = None,
     ):
         """
         Initialize the LandfillEmissions class and validate inputs.
@@ -138,6 +140,9 @@ class LandfillEmissions:
         self.gas_recovery_start_year = gas_recovery_start_year
         self.gas_recovery_end_year = gas_recovery_end_year
         self.replaced_fossil_fuel_type = replaced_fossil_fuel_type
+        self._composition_map = self._build_default_composition_map()
+        if mix_waste_composition:
+            self._apply_mix_composition(mix_waste_composition)
 
         # Load emission factor data
         self.trans_file = Path(__file__).parent.parent / "data" / "transportation.json"
@@ -145,6 +150,59 @@ class LandfillEmissions:
 
         self.data_landfill = self._load_json_file(self.landfill_file)
         self.data_trans = self._load_json_file(self.trans_file)
+
+    def _build_default_composition_map(self) -> dict:
+        """Return a name->percentage map from default _WASTE_PROPERTIES."""
+        return {k: v.get('composition', 0.0) for k, v in self._WASTE_PROPERTIES.items()}
+
+    @staticmethod
+    def _normalize_percentages(values: dict[str, float]) -> dict[str, float]:
+        total = sum(max(0.0, float(v)) for v in values.values())
+        if total <= 0:
+            return {k: 0.0 for k in values}
+        return {k: (max(0.0, float(v)) * 100.0 / total) for k, v in values.items()}
+
+    def _apply_mix_composition(self, mix: dict):
+        """
+        Apply a frontend-provided mixed waste composition, supporting either percentages
+        (sum≈100) or absolute masses which are normalized to percentages. Keys are matched
+        to our known categories. Unspecified categories default to 0, and any remainder is
+        assigned to 'others'.
+        """
+        # Accept common aliases
+        alias_map = {
+            'plastics': 'plastic',
+            'leather_rubber': 'rubber',
+            'nappies_diapers': 'nappies',
+            'hazardous_waste': 'hazardous',
+            'other': 'others',
+        }
+        cleaned: dict[str, float] = {}
+        for k, v in (mix or {}).items():
+            key = str(k).strip().lower()
+            key = alias_map.get(key, key)
+            cleaned[key] = max(0.0, float(v))
+
+        # Only keep known categories
+        known = {k: cleaned.get(k, 0.0) for k in self._WASTE_PROPERTIES.keys()}
+
+        s = sum(known.values())
+        # Heuristic: if numbers look like percentages (<=100 and sum<=100*len in extreme), treat as percentages
+        looks_like_percent = s > 0 and all(v <= 100.0 for v in known.values()) and s <= 1000.0
+        if not looks_like_percent:
+            # Normalize masses to percentages
+            known = self._normalize_percentages(known)
+
+        # Ensure total is 100 by putting remainder to 'others'
+        total_pct = sum(known.values())
+        remainder = max(0.0, 100.0 - total_pct)
+        if 'others' in known:
+            known['others'] = known.get('others', 0.0) + remainder
+        else:
+            known['others'] = remainder
+
+        # Clamp minor floats and assign
+        self._composition_map = {k: float(known.get(k, 0.0)) for k in self._WASTE_PROPERTIES.keys()}
 
     @staticmethod
     def _load_json_file(file_path: Path) -> dict:
@@ -228,15 +286,17 @@ class LandfillEmissions:
         )
         initial_deposit = w0
 
-        # Weighted average DOC from composition
+        # Weighted average DOC from (possibly overridden) composition
         weighted_doc = 0.0
         for name, vals in self._WASTE_PROPERTIES.items():
-            weighted_doc += (vals['composition'] / 100.0) * vals['doc']
+            comp_pct = self._composition_map.get(name, vals.get('composition', 0.0))
+            weighted_doc += (comp_pct / 100.0) * vals['doc']
 
         # Weighted decay rate constant k
         k_weighted = 0.0
         for name, vals in self._WASTE_PROPERTIES.items():
-            k_weighted += (vals['composition'] / 100.0) * vals['rate_constant']
+            comp_pct = self._composition_map.get(name, vals.get('composition', 0.0))
+            k_weighted += (comp_pct / 100.0) * vals['rate_constant']
 
         exp_decay = math.exp(-k_weighted)
 
@@ -403,11 +463,11 @@ class LandfillEmissions:
 
     def overall_emissions(self) -> dict:
         """
-        Calculate kgCO2e emissions and BC mass per ton of waste treated, matching composting.py output format.
+        Calculate kgCO2e emissions and BC mass per ton of waste treated, and also total (kgCO2e) outputs.
 
         Returns:
             dict: Dictionary containing all emissions, avoided emissions, total emissions,
-                  total avoided emissions, and net emissions. BC is reported as mass (kg/ton).
+                  total avoided emissions, and net emissions. BC is reported as mass (kg/ton and kg).
         """
         ch4_total = self.ch4_emit_landfill()
         ch4_a = self.ch4_avoid_landfill()
@@ -423,11 +483,13 @@ class LandfillEmissions:
 
         total_emissions = ch4_total + co2_e + n2o_e
         total_emissions_avoid = ch4_a + co2_a + n2o_a
+        net_emissions = total_emissions - total_emissions_avoid
+        net_emissions_bc = bc_e - bc_a
+
+        multiplier = self.waste_disposed if self.waste_disposed > 0 else 1
 
         return {
             "ch4_emissions": ch4_total,
-            "ch4_emissions_fossil": ch4_fossil,
-            "ch4_emissions_biogenic": ch4_biogenic,
             "ch4_emissions_avoid": ch4_a,
             "co2_emissions": co2_e,
             "co2_emissions_avoid": co2_a,
@@ -437,6 +499,20 @@ class LandfillEmissions:
             "bc_emissions_avoid": bc_a,     # kg BC/ton
             "total_emissions": total_emissions,
             "total_emissions_avoid": total_emissions_avoid,
-            "net_emissions": total_emissions - total_emissions_avoid,
-            "net_emissions_bc": bc_e - bc_a # kg BC/ton
+            "net_emissions": net_emissions,
+            "net_emissions_bc": net_emissions_bc, # kg BC/ton
+
+            # New total outputs (kgCO2e, not per tonne)
+            "ch4_emissions_total": ch4_total * multiplier,
+            "ch4_emissions_avoid_total": ch4_a * multiplier,
+            "co2_emissions_total": co2_e * multiplier,
+            "co2_emissions_avoid_total": co2_a * multiplier,
+            "n2o_emissions_total": n2o_e * multiplier,
+            "n2o_emissions_avoid_total": n2o_a * multiplier,
+            "bc_emissions_total": bc_e * multiplier,
+            "bc_emissions_avoid_total": bc_a * multiplier,
+            "total_emissions_total": total_emissions * multiplier,
+            "total_emissions_avoid_total": total_emissions_avoid * multiplier,
+            "net_emissions_total": net_emissions * multiplier,
+            "net_emissions_bc_total": net_emissions_bc * multiplier,
         }

@@ -201,6 +201,35 @@ class TransportationEmissions:
                 )
             )
         )
+
+    def ch4_emit_collection_absolute(self):
+        """Calculate absolute CH₄ emissions (kgCO₂e) for the given waste quantities.
+
+        Returns:
+            float: Total CH₄ emissions in kgCO₂e.
+        """
+
+        gwp_100_methane = self._gwp100("ch4_fossil")
+
+        # Absolute emissions = per-ton result multiplied by respective waste amounts.
+        # Transport normalized by `waste_formal`, station normalized by `waste_handled_at_station`.
+        ch4_transport_per_ton = self._calculate_emissions(
+            self.fuel_types_transport,
+            self.fuel_consumed_transport,
+            "ch4_kg_per_mj",
+            self.waste_formal,
+        )
+        ch4_station_per_ton = self._calculate_emissions(
+            self.fuel_types_station,
+            self.fuel_consumed_station,
+            "ch4_kg_per_mj",
+            self.waste_handled_at_station,
+        )
+
+        ch4_transport_abs = ch4_transport_per_ton * self.waste_formal
+        ch4_station_abs = ch4_station_per_ton * self.waste_handled_at_station
+
+        return gwp_100_methane * (ch4_transport_abs + ch4_station_abs)
     
     def bc_emit_collection(self):
         """Calculate BC emissions (mass, kg) per ton of waste collected based on vehicle type."""
@@ -223,6 +252,25 @@ class TransportationEmissions:
                 self.waste_handled_at_station,
             )
         )
+
+    def bc_emit_collection_absolute(self):
+        """Calculate absolute BC mass (kg) for the given waste quantities."""
+        bc_transport_per_ton = self._calculate_emissions(
+            self.fuel_types_transport,
+            self.fuel_consumed_transport,
+            "bc_kg_per_kg_fuel",
+            self.waste_formal,
+            self.vehicle_type,
+        )
+        bc_station_per_ton = self._calculate_emissions(
+            self.fuel_types_station,
+            self.fuel_consumed_station,
+            "bc_kg_per_mj",
+            self.waste_handled_at_station,
+        )
+        bc_transport_abs = bc_transport_per_ton * self.waste_formal
+        bc_station_abs = bc_station_per_ton * self.waste_handled_at_station
+        return bc_transport_abs + bc_station_abs
     
     def n2o_emit_collection(self):
         """Calculate N₂O emissions per ton of waste collected."""
@@ -246,6 +294,25 @@ class TransportationEmissions:
                 )
             )
         )
+
+    def n2o_emit_collection_absolute(self):
+        """Calculate absolute N₂O emissions (kgCO₂e) for the given waste quantities."""
+        gwp_100_nitrous = self._gwp100("n2o")
+        n2o_transport_per_ton = self._calculate_emissions(
+            self.fuel_types_transport,
+            self.fuel_consumed_transport,
+            "n2o_kg_per_mj",
+            self.waste_formal,
+        )
+        n2o_station_per_ton = self._calculate_emissions(
+            self.fuel_types_station,
+            self.fuel_consumed_station,
+            "n2o_kg_per_mj",
+            self.waste_handled_at_station,
+        )
+        n2o_transport_abs = n2o_transport_per_ton * self.waste_formal
+        n2o_station_abs = n2o_station_per_ton * self.waste_handled_at_station
+        return gwp_100_nitrous * (n2o_transport_abs + n2o_station_abs)
     
     def co2_emit_collection(self):
         """
@@ -285,26 +352,73 @@ class TransportationEmissions:
 
         return co2_transport + co2_station + co2_grid
 
+    def co2_emit_collection_absolute(self):
+        """Calculate absolute CO₂ emissions (kgCO₂e) for the given waste quantities."""
+        co2_transport_per_ton = self._calculate_emissions(
+            self.fuel_types_transport,
+            self.fuel_consumed_transport,
+            "co2_kg_per_mj",
+            self.waste_formal,
+        )
+        co2_station_per_ton = self._calculate_emissions(
+            self.fuel_types_station,
+            self.fuel_consumed_station,
+            "co2_kg_per_mj",
+            self.waste_handled_at_station,
+        )
+        grid_emission_factor = self.data.get("electricity_grid_factor", {})
+        total_co2_electricity = self.electric_consumed * grid_emission_factor.get("co2_kg_per_kwh", 0)
+        co2_transport_abs = co2_transport_per_ton * self.waste_formal
+        co2_station_abs = co2_station_per_ton * self.waste_handled_at_station
+        return co2_transport_abs + co2_station_abs + total_co2_electricity
+
 
     def overall_emissions(self):
-        """Calculate total emissions (CH₄, N₂O, CO₂) per ton of waste collected. BC is mass only and excluded from CO2e totals."""
+        """Return both per-ton and absolute outputs for CH4, CO2, N2O; BC is mass.
 
-        # Calculate emissions for different gases
-        ch4 = self.ch4_emit_collection()
-        co2 = self.co2_emit_collection()
-        n2o = self.n2o_emit_collection()
-        bc = self.bc_emit_collection()
+        Transportation has no avoided emissions; avoided totals are 0.
+        """
 
-        total_emissions = ch4 + co2 + n2o  # Exclude BC from CO2e totals
-        net_emissions_bc = bc  # BC mass only
+        # Per-ton emissions
+        ch4_e = self.ch4_emit_collection()
+        co2_e = self.co2_emit_collection()
+        n2o_e = self.n2o_emit_collection()
+        bc_e = self.bc_emit_collection()
+
+        # Absolute emissions (kgCO2e or kg for BC)
+        ch4_abs = self.ch4_emit_collection_absolute()
+        co2_abs = self.co2_emit_collection_absolute()
+        n2o_abs = self.n2o_emit_collection_absolute()
+        bc_abs = self.bc_emit_collection_absolute()
+
+        # Totals in CO2e exclude BC mass
+        total_emissions = ch4_e + co2_e + n2o_e
+        total_emissions_total = ch4_abs + co2_abs + n2o_abs
+
+        # Net equals total (no avoided emissions in transportation)
+        net_emissions = total_emissions
+        net_emissions_total = total_emissions_total
+        net_emissions_bc = bc_e
+        net_emissions_bc_total = bc_abs
 
         return {
-            "ch4_emissions": ch4,
-            "co2_emissions": co2,
-            "n2o_emissions": n2o,
-            "bc_emissions": bc,
+            # Per-ton outputs
+            "ch4_emissions": ch4_e,
+            "co2_emissions": co2_e,
+            "n2o_emissions": n2o_e,
+            "bc_emissions": bc_e,
             "total_emissions": total_emissions,
             "total_emissions_avoid": 0,
-            "net_emissions": total_emissions,
+            "net_emissions": net_emissions,
             "net_emissions_bc": net_emissions_bc,
+
+            # Absolute outputs
+            "ch4_emissions_total": ch4_abs,
+            "co2_emissions_total": co2_abs,
+            "n2o_emissions_total": n2o_abs,
+            "bc_emissions_total": bc_abs,
+            "total_emissions_total": total_emissions_total,
+            "total_emissions_avoid_total": 0,
+            "net_emissions_total": net_emissions_total,
+            "net_emissions_bc_total": net_emissions_bc_total,
         }

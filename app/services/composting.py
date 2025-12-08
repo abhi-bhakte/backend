@@ -7,6 +7,7 @@ content accordingly for these fuels. This is to maintain database structure cons
 """
 import json
 from pathlib import Path
+from app.models.input_models.composting_data import CompostingResponse
 
 trans_file = Path(__file__).parent.parent / "data" / "transportation.json"
 comp_file = Path(__file__).parent.parent / "data" / "composting.json"
@@ -308,7 +309,7 @@ class CompostingEmissions:
         )
 
     def overall_emissions(self):
-        """kgCO2e emissions per ton (CH4, CO2, N2O) and BC mass tracked separately."""
+        """kgCO2e emissions per ton (CH4, CO2, N2O) and BC mass tracked separately, plus per-kg outputs."""
 
         # Compute once per gas
         ch4_e = self.ch4_emit_composting()
@@ -323,7 +324,11 @@ class CompostingEmissions:
         # Totals in CO2e exclude BC mass
         total_emissions = ch4_e + co2_e + n2o_e
         total_emissions_avoid = ch4_a + co2_a + n2o_a
+        net_emissions = total_emissions - total_emissions_avoid
+        net_emissions_bc = bc_e - bc_a
 
+        # Per-output (kgCO2e, not per tonne): multiply by waste_composted
+        multiplier = self.waste_composted if self.waste_composted > 0 else 1
         return {
             "ch4_emissions": ch4_e,
             "ch4_emissions_avoid": ch4_a,
@@ -335,8 +340,22 @@ class CompostingEmissions:
             "bc_emissions_avoid": bc_a,
             "total_emissions": total_emissions,
             "total_emissions_avoid": total_emissions_avoid,
-            "net_emissions": total_emissions - total_emissions_avoid,
-            "net_emissions_bc": bc_e - bc_a,
+            "net_emissions": net_emissions,
+            "net_emissions_bc": net_emissions_bc,
+
+            # New total outputs (kgCO2e, not per tonne)
+            "ch4_emissions_total": ch4_e * multiplier,
+            "ch4_emissions_avoid_total": ch4_a * multiplier,
+            "co2_emissions_total": co2_e * multiplier,
+            "co2_emissions_avoid_total": co2_a * multiplier,
+            "n2o_emissions_total": n2o_e * multiplier,
+            "n2o_emissions_avoid_total": n2o_a * multiplier,
+            "bc_emissions_total": bc_e * multiplier,
+            "bc_emissions_avoid_total": bc_a * multiplier,
+            "total_emissions_total": total_emissions * multiplier,
+            "total_emissions_avoid_total": total_emissions_avoid * multiplier,
+            "net_emissions_total": net_emissions * multiplier,
+            "net_emissions_bc_total": net_emissions_bc * multiplier,
         }
 
 
