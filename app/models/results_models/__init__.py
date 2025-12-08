@@ -1,4 +1,4 @@
-from .transportation import TransportationRequest, TransportationResponse
+# Transportation request/response moved to input_models.transportation_data
 # from .composting import CompostingRequest, CompostingResponse
 # from .anaerobic_digestion import AnaerobicDigestionRequest, AnaerobicDigestionResponse
 # from .recycling import RecyclingRequest, RecyclingResponse
@@ -7,7 +7,7 @@ from .transportation import TransportationRequest, TransportationResponse
 # from .landfill import LandfillRequest, LandfillResponse
 
 __all__ = [
-    "TransportationRequest", "TransportationResponse",
+    # "TransportationRequest", "TransportationResponse",
     # "CompostingRequest", "CompostingResponse",
     # "AnaerobicDigestionRequest", "AnaerobicDigestionResponse",
     # "RecyclingRequest", "RecyclingResponse",
