@@ -68,7 +68,7 @@
         }
     ],
     "electricity_grid_factor": {
-        "co2_kg_per_kwh": 0.896515846
+        "co2_kg_per_kwh": 0.904746
     },
     "incineration_emissions": [
         {
