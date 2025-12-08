@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
-from app.models.results_models.composting import CompostingResponse
+from app.models.input_models.composting_data import CompostingResponse
 from app.models.input_models.composting_data import CompostingData
 from app.services.composting import CompostingEmissions
 
@@ -42,10 +42,8 @@ def calculate_composting_emissions(request: CompostingData):
             fuel_consumed_operation=fuel_amounts,
         )
 
-        # Compute overall emissions
+        # Compute overall emissions (now includes per-kg outputs)
         emissions = emissions_service.overall_emissions()
-
-        # Return the computed emissions as a response
         return CompostingResponse(**emissions)
 
     except ValueError as e:

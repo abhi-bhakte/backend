@@ -3,9 +3,7 @@ from typing import List
 from app.models.input_models.anaerobic_digestion_data import (
     AnaerobicDigestionData,
 )
-from app.models.results_models.anaerobic_digestion import (
-    AnaerobicDigestionResponse,
-)
+from app.models.input_models.anaerobic_digestion_data import AnaerobicDigestionResponse
 from app.services.anaerobic_digestion import AnaerobicDigestionEmissions
 
 # Create a FastAPI router instance
