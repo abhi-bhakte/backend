@@ -112,7 +112,7 @@
             "oxidation_factor_percent": 100
         },
         {
-            "waste_type": "plastics",
+            "waste_type": "plastic",
             "dry_matter_percent": 100,
             "total_carbon_percent": 75,
             "fossil_carbon_percent": 100,
@@ -154,7 +154,7 @@
             "oxidation_factor_percent": 0
         },
         {
-            "waste_type": "nappies_diapers",
+            "waste_type": "nappies",
             "dry_matter_percent": 40,
             "total_carbon_percent": 70,
             "fossil_carbon_percent": 10,
