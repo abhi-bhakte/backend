@@ -17,7 +17,7 @@ class WasteComposition(BaseModel):
     plastic: float = Field(..., description="Percentage of plastic waste")
     paper: float = Field(..., description="Percentage of paper waste")
     textile: float = Field(..., description="Percentage of textile waste")
-    leather_rubber: float = Field(..., description="Percentage of leather and rubber waste")
+    rubber: float = Field(..., description="Percentage of leather and rubber waste")
     glass: float = Field(..., description="Percentage of glass waste")
     metal: float = Field(..., description="Percentage of metal waste (aluminum + steel)")
     nappies: float = Field(..., description="Percentage of nappies/diapers")

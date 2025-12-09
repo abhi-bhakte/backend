@@ -16,13 +16,13 @@ class FuelConsumption(BaseModel):
 class MixedWasteComposition(BaseModel):
     food: float = Field(..., description="Food waste (%)")
     garden: float = Field(..., description="Garden waste (%)")
-    plastics: float = Field(..., description="Plastics (%)")
+    plastic: float = Field(..., description="plastic (%)")
     paper: float = Field(..., description="Paper (%)")
     textile: float = Field(..., description="Textile (%)")
     rubber: float = Field(..., description="Leather/rubber (%)")
     glass: float = Field(..., description="Glass (%)")
     metal: float = Field(..., description="Metal (aluminium + steel) (%)")
-    nappies_diapers: float = Field(..., description="Nappies (disposable diapers) (%)")
+    nappies: float = Field(..., description="Nappies (disposable diapers) (%)")
     wood: float = Field(..., description="Wood (%)")
     others: float = Field(..., description="Others (%)")
 

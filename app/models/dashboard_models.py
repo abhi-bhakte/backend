@@ -1,12 +1,16 @@
 from pydantic import BaseModel
-from typing import Optional, Dict
-
-from typing import List
+from typing import Optional, Dict, List
 
 class DailyStat(BaseModel):
     date: str
     collected: float
     emissions: float
+
+
+class SankeyTransfer(BaseModel):
+    source: str
+    target: str
+    value: float
 
 class CitySummaryResponse(BaseModel):
     city_name: str
@@ -23,3 +27,10 @@ class CitySummaryResponse(BaseModel):
     composition_cumulative: Optional[Dict[str, float]]
     material_recovery_cumulative: Optional[Dict[str, float]]
     daily_stats: Optional[List[DailyStat]]
+    compostingGWP: Optional[float]
+    anaerobicDigestionGWP: Optional[float]
+    recyclingGWP: Optional[float]
+    landfillGWP: Optional[float]
+    incinerationGWP: Optional[float]
+    pyrolysisGWP: Optional[float]
+    transfers: Optional[List[SankeyTransfer]]

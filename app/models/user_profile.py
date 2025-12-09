@@ -15,7 +15,7 @@ class WasteComposition(BaseModel):
     plastic: float
     paper: float
     textile: float
-    leatherRubber: float
+    rubber: float
     glass: float
     metal: float
     nappies: float
@@ -41,14 +41,14 @@ class AnaerobicDigestion(BaseModel):
     fuelsUsed: List[str]
 
 class RecyclingFormal(BaseModel):
-    paperCardboard: str
+    paper: str
     plastic: str
     aluminum: str
     steel: str
     glass: str
 
 class RecyclingInformal(BaseModel):
-    paperCardboard: str
+    paper: str
     plastic: str
     aluminum: str
     steel: str
