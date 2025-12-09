@@ -53,7 +53,7 @@ class LandfillEmissions:
         annual_growth_rate (float): Estimated growth of annual disposal at the landfill (%).
         fossil_fuel_types (list[str]): Types of fossil fuels used for operation activities.
         fossil_fuel_consumed (list[float]): Consumption of fossil fuels used for operation activities (liters).
-        grid_electricity (float): Grid electricity used for operation activities (kWh).
+        electricity_kwh_per_day (float): Grid electricity used for operation activities (kWh).
         gas_collection_efficiency (float): Efficiency of gas collection (%).
         gas_treatment_method (str): Treatment method of collected landfill gas.
         lfg_utilization_efficiency (float): LFG utilization efficiency (e.g., electricity production, flare efficiency).
@@ -73,7 +73,7 @@ class LandfillEmissions:
         annual_growth_rate: float,
         fossil_fuel_types: list,
         fossil_fuel_consumed: list,
-        grid_electricity: float,
+        electricity_kwh_per_day: float,
         gas_collection_efficiency: float = 0.0,
         gas_treatment_method: str = None,
         lfg_utilization_efficiency: float = 0.0,
@@ -95,7 +95,7 @@ class LandfillEmissions:
             annual_growth_rate (float): Estimated growth of annual disposal at the landfill (%).
             fossil_fuel_types (list[str]): Types of fossil fuels used for operation activities.
             fossil_fuel_consumed (list[float]): Consumption of fossil fuels used for operation activities (liters).
-            grid_electricity (float): Grid electricity used for operation activities (kWh).
+            electricity_kwh_per_day (float): Grid electricity used for operation activities (kWh).
             gas_collection_efficiency (float): Efficiency of gas collection (%).
             gas_treatment_method (str): Treatment method of collected landfill gas.
             lfg_utilization_efficiency (float): LFG utilization efficiency (e.g., electricity production, flare efficiency).
@@ -112,7 +112,7 @@ class LandfillEmissions:
             for x in [
                 waste_disposed,
                 annual_growth_rate,
-                grid_electricity,
+                electricity_kwh_per_day,
                 gas_collection_efficiency,
                 lfg_utilization_efficiency,
             ]
@@ -133,7 +133,7 @@ class LandfillEmissions:
         self.annual_growth_rate = annual_growth_rate
         self.fossil_fuel_types = fossil_fuel_types
         self.fossil_fuel_consumed = fossil_fuel_consumed
-        self.grid_electricity = grid_electricity
+        self.electricity_kwh_per_day = electricity_kwh_per_day
         self.gas_collection_efficiency = gas_collection_efficiency
         self.gas_treatment_method = gas_treatment_method
         self.lfg_utilization_efficiency = lfg_utilization_efficiency
@@ -171,11 +171,11 @@ class LandfillEmissions:
         """
         # Accept common aliases
         alias_map = {
-            'plastics': 'plastic',
-            'leather_rubber': 'rubber',
-            'nappies_diapers': 'nappies',
-            'hazardous_waste': 'hazardous',
-            'other': 'others',
+            'plastic': 'plastic',
+            'rubber': 'rubber',
+            'nappies': 'nappies',
+            'hazardous': 'hazardous',
+            'others': 'others',
         }
         cleaned: dict[str, float] = {}
         for k, v in (mix or {}).items():
@@ -393,7 +393,7 @@ class LandfillEmissions:
 
         amount_deposited = self.waste_disposed * (100 - self.waste_disposed_fired) / 100
 
-        total_co2_electricity = self.grid_electricity * co2_per_kwh / amount_deposited if amount_deposited > 0 else 0
+        total_co2_electricity = self.electricity_kwh_per_day * co2_per_kwh / amount_deposited if amount_deposited > 0 else 0
 
         co2_fuel_combustion = self._calculate_emissions(
             self.fossil_fuel_types,

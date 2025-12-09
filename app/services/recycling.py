@@ -7,7 +7,6 @@ content accordingly for these fuels. This is to maintain database structure cons
 """
 import json
 from pathlib import Path
-from .transportation import TransportationEmissions
 
 class RecyclingEmissions:
     """
@@ -112,6 +111,54 @@ class RecyclingEmissions:
 
         return total_emissions
 
+    def _emission_breakdown(self, emission_factor_key, include_electricity=False):
+        """Return per-ton emissions for formal, informal, and combined waste streams."""
+        total_collected = self.recycle_collected_formal + self.recycle_collected_informal
+        if total_collected > 0:
+            formal_fraction = self.recycle_collected_formal / total_collected
+            informal_fraction = self.recycle_collected_informal / total_collected
+        else:
+            formal_fraction = 0
+            informal_fraction = 0
+
+        grid_factor = self.data_recycling["electricity_grid_factor"].get("co2_kg_eq_per_kwh", 0) if include_electricity else 0
+
+        formal_per_ton = 0
+        for material, composition_percentage in self.material_composition_formal.items():
+            fuel_emissions = (composition_percentage / 100) * self._calculate_fuel_emissions(
+                self.fuel_types_operation.get(material, []),
+                self.fuel_consumed_operation.get(material, []),
+                emission_factor_key,
+            )
+            electricity_emissions = (composition_percentage / 100) * (
+                self.electricity_consumed.get(material, 0) * grid_factor
+            ) if include_electricity else 0
+            formal_per_ton += fuel_emissions + electricity_emissions
+
+        informal_per_ton = 0
+        for material, composition_percentage in self.material_composition_informal.items():
+            fuel_emissions = (composition_percentage / 100) * self._calculate_fuel_emissions(
+                self.fuel_types_operation.get(material, []),
+                self.fuel_consumed_operation.get(material, []),
+                emission_factor_key,
+            )
+            electricity_emissions = (composition_percentage / 100) * (
+                self.electricity_consumed.get(material, 0) * grid_factor
+            ) if include_electricity else 0
+            informal_per_ton += fuel_emissions + electricity_emissions
+
+        combined_per_ton = (
+            formal_per_ton * formal_fraction + informal_per_ton * informal_fraction
+            if total_collected > 0
+            else 0
+        )
+
+        return {
+            "formal_per_ton": formal_per_ton,
+            "informal_per_ton": informal_per_ton,
+            "combined_per_ton": combined_per_ton,
+        }
+
     def calculate_emissions(self, emission_factor_key, include_electricity=False):
         """
         Calculate emissions (kg CO₂-eq) per ton of waste recycled for both formal and informal sectors,
@@ -124,61 +171,22 @@ class RecyclingEmissions:
         Returns:
             float: Combined emissions (kg CO₂-eq) for both formal and informal sectors.
         """
-        # Fraction of recyclables treated by the formal sector
-        formal_fraction = self.recycle_collected_formal / (
-            self.recycle_collected_formal + self.recycle_collected_informal
-        )
-        informal_fraction = self.recycle_collected_informal / (
-            self.recycle_collected_formal + self.recycle_collected_informal
-        )
+        breakdown = self._emission_breakdown(emission_factor_key, include_electricity)
+        return breakdown["combined_per_ton"]
 
-        # Load the electricity grid factor from the JSON file (only if electricity is included)
-        grid_factor = self.data_recycling["electricity_grid_factor"].get("co2_kg_eq_per_kwh", 0) if include_electricity else 0
+    def _emission_totals(self, emission_factor_key, include_electricity=False, gwp_factor=1.0):
+        """Return per-ton and absolute emissions for the supplied factor."""
+        breakdown = self._emission_breakdown(emission_factor_key, include_electricity)
 
-        # Initialize total emissions for the formal and informal sectors
-        total_emissions_formal = 0
-        total_emissions_informal = 0
+        formal_total = breakdown["formal_per_ton"] * self.recycle_collected_formal
+        informal_total = breakdown["informal_per_ton"] * self.recycle_collected_informal
 
-        # Calculate emissions for the formal sector
-        for material, composition_percentage in self.material_composition_formal.items():
-            # Emissions from fuel
-            fuel_emissions = (composition_percentage / 100) * self._calculate_fuel_emissions(
-                self.fuel_types_operation.get(material, []),  # Fuel types for the material
-                self.fuel_consumed_operation.get(material, []),  # Fuel consumption for the material
-                emission_factor_key  # Emission factor key (e.g., "co2_kg_per_mj")
-            )
-            # Emissions from electricity (if included)
-            electricity_emissions = (composition_percentage / 100) * (
-                self.electricity_consumed.get(material, 0) * grid_factor
-            ) if include_electricity else 0
-            # Total emissions for the material
-            total_emissions_formal += fuel_emissions + electricity_emissions
-
-        # Scale emissions by the formal fraction
-        total_emissions_formal *= formal_fraction
-
-        # Calculate emissions for the informal sector
-        for material, composition_percentage in self.material_composition_informal.items():
-            # Emissions from fuel
-            fuel_emissions = (composition_percentage / 100) * self._calculate_fuel_emissions(
-                self.fuel_types_operation.get(material, []),  # Fuel types for the material
-                self.fuel_consumed_operation.get(material, []),  # Fuel consumption for the material
-                emission_factor_key  # Emission factor key (e.g., "co2_kg_per_mj")
-            )
-            # Emissions from electricity (if included)
-            electricity_emissions = (composition_percentage / 100) * (
-                self.electricity_consumed.get(material, 0) * grid_factor
-            ) if include_electricity else 0
-            # Total emissions for the material
-            total_emissions_informal += fuel_emissions + electricity_emissions
-
-        # Scale emissions by the informal fraction
-        total_emissions_informal *= informal_fraction
-
-        # Combine emissions from both sectors
-        total_emissions = total_emissions_formal + total_emissions_informal
-
-        return total_emissions
+        return {
+            "per_ton": breakdown["combined_per_ton"] * gwp_factor,
+            "formal_total": formal_total * gwp_factor,
+            "informal_total": informal_total * gwp_factor,
+            "total": (formal_total + informal_total) * gwp_factor,
+        }
 
     def _gwp100(self, key: str) -> float:
         """Return GWP100 using the exact JSON key from transportation data."""
@@ -190,7 +198,7 @@ class RecyclingEmissions:
         Calculate CH₄ emissions (kg CO₂-eq) per ton of waste recycled for both formal and informal sectors.
         """
         gwp_100_ch4 = self._gwp100("ch4_fossil")
-        return gwp_100_ch4 * self.calculate_emissions("ch4_kg_per_mj")
+        return self._emission_totals("ch4_kg_per_mj", gwp_factor=gwp_100_ch4)["per_ton"]
 
     def ch4_avoid_recycling(self):
         """
@@ -202,7 +210,7 @@ class RecyclingEmissions:
         """
         Calculate black carbon (BC) mass in kg per ton of waste recycled (not CO2e).
         """
-        return self.calculate_emissions("bc_kg_per_mj")
+        return self._emission_totals("bc_kg_per_mj")["per_ton"]
 
     def bc_avoid_recycling(self):
         """
@@ -214,7 +222,7 @@ class RecyclingEmissions:
         """
         Calculate CO₂ emissions (kg CO₂-eq) per ton of waste recycled for both formal and informal sectors.
         """
-        return self.calculate_emissions("co2_kg_per_mj", include_electricity=True)
+        return self._emission_totals("co2_kg_per_mj", include_electricity=True)["per_ton"]
 
     def co2_avoid_recycling(self):
         """
@@ -227,7 +235,7 @@ class RecyclingEmissions:
         Calculate N₂O emissions (kg CO₂-eq) per ton of waste recycled for both formal and informal sectors.
         """
         gwp_100_n2o = self._gwp100("n2o")
-        return gwp_100_n2o * self.calculate_emissions("n2o_kg_per_mj")
+        return self._emission_totals("n2o_kg_per_mj", gwp_factor=gwp_100_n2o)["per_ton"]
 
     def n2o_avoid_recycling(self):
         """
@@ -238,17 +246,33 @@ class RecyclingEmissions:
     def overall_emissions(self):
         """kgCO2e emissions per ton (CH4, CO2, N2O) and BC mass tracked separately."""
 
-        ch4_e = self.ch4_emit_recycling()
+        ch4_data = self._emission_totals("ch4_kg_per_mj", gwp_factor=self._gwp100("ch4_fossil"))
+        ch4_e = ch4_data["per_ton"]
         ch4_a = self.ch4_avoid_recycling()
-        co2_e = self.co2_emit_recycling()
+        ch4_total = ch4_data["total"]
+        co2_data = self._emission_totals("co2_kg_per_mj", include_electricity=True)
+        co2_e = co2_data["per_ton"]
         co2_a = self.co2_avoid_recycling()
-        n2o_e = self.n2o_emit_recycling()
+        co2_total = co2_data["total"]
+        n2o_data = self._emission_totals("n2o_kg_per_mj", gwp_factor=self._gwp100("n2o"))
+        n2o_e = n2o_data["per_ton"]
         n2o_a = self.n2o_avoid_recycling()
-        bc_e = self.bc_emit_recycling()
+        n2o_total = n2o_data["total"]
+        bc_data = self._emission_totals("bc_kg_per_mj")
+        bc_e = bc_data["per_ton"]
         bc_a = self.bc_avoid_recycling()
+        bc_total = bc_data["total"]
 
         total_emissions = ch4_e + co2_e + n2o_e
         total_emissions_avoid = ch4_a + co2_a + n2o_a
+
+        total_collected = self.recycle_collected_formal + self.recycle_collected_informal
+        total_emissions_total = ch4_total + co2_total + n2o_total
+        total_emissions_avoid_total = total_emissions_avoid * total_collected
+        net_emissions_total = total_emissions_total - total_emissions_avoid_total
+        bc_emissions_total = bc_total
+        bc_emissions_avoid_total = bc_a * total_collected
+        net_emissions_bc_total = bc_emissions_total - bc_emissions_avoid_total
 
         return {
             "ch4_emissions": ch4_e,
@@ -263,4 +287,16 @@ class RecyclingEmissions:
             "total_emissions_avoid": total_emissions_avoid,
             "net_emissions": total_emissions - total_emissions_avoid,
             "net_emissions_bc": bc_e - bc_a,
+            "ch4_emissions_total": ch4_total,
+            "ch4_emissions_avoid_total": ch4_a * total_collected,
+            "co2_emissions_total": co2_total,
+            "co2_emissions_avoid_total": co2_a * total_collected,
+            "n2o_emissions_total": n2o_total,
+            "n2o_emissions_avoid_total": n2o_a * total_collected,
+            "bc_emissions_total": bc_emissions_total,
+            "bc_emissions_avoid_total": bc_emissions_avoid_total,
+            "total_emissions_total": total_emissions_total,
+            "total_emissions_avoid_total": total_emissions_avoid_total,
+            "net_emissions_total": net_emissions_total,
+            "net_emissions_bc_total": net_emissions_bc_total,
         }
