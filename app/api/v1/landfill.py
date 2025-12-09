@@ -32,7 +32,7 @@ def calculate_landfill_emissions(request: LandfillData):
             annual_growth_rate=(request.landfill_operation.annual_growth_rate if request.landfill_operation and request.landfill_operation.annual_growth_rate is not None else 0.0),
             fossil_fuel_types=[k for k, v in request.fuel_consumption.dict().items() if v is not None and v > 0],
             fossil_fuel_consumed=[v for v in request.fuel_consumption.dict().values() if v is not None and v > 0],
-            grid_electricity=request.electricity_kwh_per_day,
+            electricity_kwh_per_day=request.electricity_kwh_per_day,
             gas_collection_efficiency=(request.landfill_gas_recovery.gas_collection_efficiency if request.landfill_gas_recovery and request.landfill_gas_recovery.gas_collection_efficiency is not None else 0.0),
             gas_treatment_method=(request.landfill_gas_recovery.gas_treatment_method if request.landfill_gas_recovery and request.landfill_gas_recovery.gas_treatment_method is not None else None),
             lfg_utilization_efficiency=(request.landfill_gas_recovery.lfg_utilization_efficiency if request.landfill_gas_recovery and request.landfill_gas_recovery.lfg_utilization_efficiency is not None else 0.0),

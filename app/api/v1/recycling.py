@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.results_models.recycling import RecyclingRequest, RecyclingResponse
+from app.models.input_models.recycling_data import RecyclingData, RecyclingResponse
 from app.services.recycling import RecyclingEmissions
 
 # Create a FastAPI router instance
@@ -7,12 +7,12 @@ router = APIRouter()
 
 
 @router.post("/calculate", response_model=RecyclingResponse)
-def calculate_recycling_emissions(request: RecyclingRequest):
+def calculate_recycling_emissions(request: RecyclingData):
     """
     API endpoint to compute GHG emissions for recycling.
 
     Args:
-        request (RecyclingRequest): Input data containing recycling and fuel usage details.
+        request (RecyclingData): Input data containing recycling and fuel usage details.
 
     Returns:
         RecyclingResponse: Calculated emissions data.
