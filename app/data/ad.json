@@ -1,7 +1,7 @@
 {
     "ad_emissions": {
         "ipcc_default_values": {
-            "ch4_kg_per_ton": 1,
+            "ch4_kg_per_ton": 0.88,
             "n2o_kg_per_ton": 0
         }
     },
@@ -61,5 +61,14 @@
                 "bc_kg_per_mj": 0.00000005
             }
         }
-    ]
+    ],
+    "ad_avoided_emissions": {
+        "biogas_production_potential_m3_per_tonne": 140,
+        "electricity_efficiency_ic_engine_percent": 35,
+        "efficiency_heat_recovery_percent": 50,
+        "methane_content_biogas_percent": 60,
+        "heating_value_methane_mj_per_m3": 37,
+        "compost_from_ad_kg_per_tonne": 200,
+        "moisture_content_compost_percent": 40
+    }
 }

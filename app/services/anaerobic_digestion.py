@@ -11,6 +11,7 @@ from pathlib import Path
 
 trans_file = Path(__file__).parent.parent / "data" / "transportation.json"
 ad_file = Path(__file__).parent.parent / "data" / "ad.json"
+comp_file = Path(__file__).parent.parent / "data" / "composting.json"
 
 
 class AnaerobicDigestionEmissions:
@@ -19,7 +20,7 @@ class AnaerobicDigestionEmissions:
     
     Attributes:
         waste_digested (float): Total waste anaerobically digested (tons).
-        ad_energy_product (str): Type of product from anaerobic digestion (electricity, heat, biogas).
+        ad_energy_product (str): Type of product from anaerobic digestion (electricity, electricity_heat, biogas).
         fuel_replaced (str): Fossil fuel replaced if the recovered product is heat or biogas.
         compost_recovered (bool): Whether compost (solid digestate) is recovered from AD.
         percent_compost_use_agri_garden (float): Percentage of recovered compost used in agriculture/gardens.
@@ -72,6 +73,15 @@ class AnaerobicDigestionEmissions:
         except json.JSONDecodeError as e:
             raise ValueError(f"Error decoding JSON file {self.trans_file}: {e}")
 
+        # Load composting data for avoided fertilizer emissions
+        try:
+            with open(comp_file, "r", encoding="utf-8") as file:
+                self.data_comp = json.load(file)
+        except FileNotFoundError:
+            self.data_comp = {}
+        except json.JSONDecodeError:
+            self.data_comp = {}
+
     @staticmethod
     def _normalize_key(value: str) -> str:
         """Normalize strings for key matching (lowercase, underscores)."""
@@ -118,6 +128,105 @@ class AnaerobicDigestionEmissions:
         # Normalize emissions by waste amount, avoiding division by zero
         return total_emissions / per_waste if per_waste > 0 else 0.0
     
+    def _calculate_avoided_emissions(self, factor_key: str) -> float:
+        """
+        Generalized avoided emissions calculator for AD outputs.
+
+        Computes avoided emissions per ton of waste for gases using:
+        - Electricity production replacing grid CO₂ (only for CO₂)
+        - Heat recovery or direct biogas use replacing selected fossil fuel
+        - Compost recovery replacing chemical fertilizer production
+
+        Args:
+            factor_key (str): One of "co2_kg_per_mj", "ch4_kg_per_mj",
+                              "n2o_kg_per_mj", "bc_kg_per_mj".
+
+        Returns:
+            float: Avoided emissions per ton (kg for the specified gas).
+        """
+        avoided_total = 0.0
+
+        product = self._normalize_key(self.ad_energy_product)
+        fuel_replaced = self._normalize_key(self.fuel_replaced)
+
+        ad_factors = self.data_ad.get("ad_avoided_emissions", {})
+        biogas_production_potential = float(ad_factors.get("biogas_production_potential_m3_per_tonne", 0) or 0)
+        biogas_ch4_content = float(ad_factors.get("methane_content_biogas_percent", 0) or 0)
+        ch4_heating_value = float(ad_factors.get("heating_value_methane_mj_per_m3", 0) or 0)
+        ic_engine_efficiency = float(ad_factors.get("electricity_efficiency_ic_engine_percent", 0) or 0)
+        heat_recovery_effciency = float(ad_factors.get("efficiency_heat_recovery_percent", 0) or 0)
+
+        ipcc_defaults = self.data_ad.get("ad_emissions", {}).get("ipcc_default_values", {})
+        bio_compost_factor = float(ipcc_defaults.get("ch4_kg_per_ton", 0) or 0)
+
+        # Calculate methane emitted during composting (m3/tonne)
+        ch4_emitted = bio_compost_factor / 0.67
+
+        # Methane volume available (m3 CH4 per ton)
+        total_ch4_vol = biogas_production_potential * (biogas_ch4_content / 100.0)
+        collected_ch4_vol = max(total_ch4_vol - ch4_emitted, 0.0)
+
+        # Energy available from CH4 (MJ per ton)
+        biogas_energy_content = collected_ch4_vol * ch4_heating_value
+
+        # Electricity component (only affects CO2)
+        if product in ("electricity", "electricity_heat") and factor_key == "co2_kg_per_mj":
+            grid_factor = self.data_trans.get("electricity_grid_factor", {})
+            co2_per_kwh = float(grid_factor.get("co2_kg_per_kwh", 0) or 0)
+            electricity_production_potential = (biogas_energy_content / 3.6) * (ic_engine_efficiency / 100)
+            biogas_electricity = electricity_production_potential * co2_per_kwh
+            avoided_total += biogas_electricity 
+
+        # Heat or direct biogas replacing fossil fuel (all gases)
+        fuel_data_list = self.data_ad.get("fuel_data", [])
+        fuel_obj = next((f for f in fuel_data_list if self._normalize_key(f.get("fuel_type")) == fuel_replaced), None)
+        if fuel_obj:
+            emission_factor = float((fuel_obj.get("emission_factors", {}) or {}).get(factor_key, 0) or 0)
+            energy_content = float(fuel_obj.get("energy_content_mj_per_l", 0) or 0)
+            if product == "electricity_heat":
+                # Calculate the heat recovered potential (MJ/tonne)
+                heat_recovered_potential = (heat_recovery_effciency / 100) * biogas_energy_content
+
+                # Calculate the recovered heat fuel offset (L/tonne)
+                recovered_heat_fuel_offset = heat_recovered_potential / energy_content
+
+                # Calculate emissions based on energy content and emission factor
+                ch4_biogas_heat = recovered_heat_fuel_offset * energy_content * emission_factor
+                avoided_total += ch4_biogas_heat
+            elif product == "biogas":
+                total_biogas_production_potential = collected_ch4_vol / (biogas_ch4_content / 100)
+
+                # Calculate the recovered heat fuel offset (L/tonne)
+                recovered_heat_fuel_offset = total_biogas_production_potential * (biogas_ch4_content/100) * ch4_heating_value / energy_content
+
+                # Calculate emissions based on energy content and emission factor
+                ch4_biogas_thermal = recovered_heat_fuel_offset * energy_content * emission_factor
+                avoided_total += ch4_biogas_thermal
+
+        # Compost replacing fertilizer production
+        if self.compost_recovered and self.data_comp:
+            fert_list = self.data_comp.get("fertilizer_production_emissions", [])
+            total_entry = next((x for x in fert_list if self._normalize_key(x.get("fertilizer_type")) == "total"), {})
+            key_map = {
+                "co2_kg_per_mj": "co2_emission_g_per_kg",
+                "ch4_kg_per_mj": "ch4_emission_g_per_kg",
+                "n2o_kg_per_mj": "n2o_emission_g_per_kg",
+            }
+            g_per_kg_key = key_map.get(factor_key)
+
+            ferti_ch4_factor = float(total_entry.get(g_per_kg_key, 0) or 0)
+
+            # Get compost_from_ad_kg_per_tonne from ad.json constants
+            compost_from_ad = float(ad_factors.get("compost_from_ad_kg_per_tonne", 0) or 0)
+            ch4_chemical_fertilizer = (
+                ferti_ch4_factor
+                * (self.percent_compost_use_agri_garden / 100)
+                * (compost_from_ad / 1000)
+            )
+            avoided_total += ch4_chemical_fertilizer
+
+        return avoided_total
+    
     def ch4_emit_ad(self):
         """
         Calculate CH₄ emissions from anaerobic digestion (AD).
@@ -155,8 +264,11 @@ class AnaerobicDigestionEmissions:
         )
 
     def ch4_avoid_ad(self):
-        """Calculate methane emissions."""
-        return 0
+        """Calculate avoided CH₄ emissions (CO₂-eq per ton)."""
+        avoided_ch4 = self._calculate_avoided_emissions("ch4_kg_per_mj")
+        gwp_factors = self.data_trans.get("gwp_factors", {})
+        gwp_100_ch4_fossil = (gwp_factors.get("ch4_fossil", {}) or {}).get("gwp100", 0) or 0
+        return gwp_100_ch4_fossil * avoided_ch4
 
     def co2_emit_ad(self):
         """
@@ -183,8 +295,8 @@ class AnaerobicDigestionEmissions:
         return co2_from_fuel + (total_co2_electricity / self.waste_digested)
 
     def co2_avoid_ad(self):
-        """Calculate methane emissions."""
-        return 0
+        """Calculate avoided CO₂ emissions (kg per ton)."""
+        return self._calculate_avoided_emissions("co2_kg_per_mj")
 
     def n2o_emit_ad(self):
         """
@@ -208,7 +320,11 @@ class AnaerobicDigestionEmissions:
         return (gwp_100_n2o * n2o_from_fuel)
 
     def n2o_avoid_ad(self):
-        return 0
+        """Calculate avoided N₂O emissions (CO₂-eq per ton)."""
+        avoided_n2o = self._calculate_avoided_emissions("n2o_kg_per_mj")
+        gwp_factors = self.data_trans.get("gwp_factors", {})
+        gwp_100_n2o = (gwp_factors.get("n2o", {}) or {}).get("gwp100", 0) or 0
+        return gwp_100_n2o * avoided_n2o
 
     def bc_emit_ad(self):
         """
@@ -223,8 +339,11 @@ class AnaerobicDigestionEmissions:
         )
 
     def bc_avoid_ad(self):
-        """Calculate methane emissions."""
-        return 0
+        """Calculate avoided BC mass (kg per ton)."""
+        return self._calculate_avoided_emissions("bc_kg_per_mj")
+    
+
+
 
     def overall_emissions(self):
         """kgCO2e emissions and emissions avoided per ton of waste digested, plus total (kgCO2e) outputs."""
