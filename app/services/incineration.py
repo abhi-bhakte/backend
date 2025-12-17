@@ -1,7 +1,5 @@
 import json
 from pathlib import Path
-from .transportation import TransportationEmissions
-
 
 
 class IncinerationEmissions:
@@ -72,6 +70,11 @@ class IncinerationEmissions:
             raise FileNotFoundError(f"The file {file_path} was not found.")
         except json.JSONDecodeError:
             raise ValueError(f"Error decoding JSON file: {file_path}")
+        
+    @staticmethod
+    def _normalize_key(value: str) -> str:
+        """Normalize strings for key matching (lowercase, underscores)."""
+        return str(value).strip().lower().replace(" ", "_")
 
     def _calculate_emissions(
         self, fuel_types: list, fuel_consumed: list, factor_key: str, per_waste: float
@@ -105,6 +108,100 @@ class IncinerationEmissions:
                 total_emissions += consumption * energy_content * emission_factor
 
         return total_emissions / per_waste if per_waste > 0 else 0
+    
+    def _calculate_avoided_emissions(self, factor_key: str) -> float:
+        """Compute avoided emissions from energy recovery.
+
+        This method estimates emissions avoided due to energy recovered from
+        the incineration process. Heat recovery avoids burning a specified
+        fossil fuel by displacing its energy-equivalent. Electricity recovery
+        avoids grid electricity emissions.
+
+        Args:
+            factor_key: Emission factor key to use for the displaced fuel,
+                e.g., "co2_kg_per_mj", "ch4_kg_per_mj", "n2o_kg_per_mj",
+                or "bc_kg_per_mj".
+
+        Returns:
+            float: Avoided emissions per ton of waste treated, in the same
+                pollutant mass unit as the selected factor key (kg/ton).
+        """
+
+        # Defaults to robustly handle missing inputs and partial configs
+        avoided_total = 0.0
+        heat_recovered = 0.0
+        electricity_recovered = 0.0
+
+        # ---- Heat energy recovery (MJ -> avoided pollutant mass) ----
+        # Displace a specific fossil fuel if provided (use first item if list).
+        displaced_fuel = (
+            self.fossil_fuel_replaced[0]
+            if isinstance(self.fossil_fuel_replaced, list)
+            and len(self.fossil_fuel_replaced) > 0
+            else None
+        )
+
+        if (
+            displaced_fuel
+            and self.calorific_value_mj_per_kg is not None
+            and self.efficiency_heat_recovery > 0
+        ):
+            fuel_data = self.data_incineration.get("fuel_data", [])
+            fuel_obj = next(
+                (f for f in fuel_data if f.get("fuel_type") == displaced_fuel),
+                None,
+            )
+            if fuel_obj:
+                emission_factor = float(
+                    (fuel_obj.get("emission_factors", {}) or {}).get(
+                        factor_key, 0
+                    )
+                    or 0
+                )
+                # MJ per ton available for sale after on-site heat usage
+                total_heat_mj = (
+                    (self.efficiency_heat_recovery / 100.0)
+                    * 1000.0
+                    * self.calorific_value_mj_per_kg
+                )
+                exportable_heat_mj = (
+                    (100.0 - self.percentage_heat_used_onsite) / 100.0
+                ) * total_heat_mj
+                # Convert exportable MJ to avoided pollutant mass (kg)
+                heat_recovered = emission_factor * exportable_heat_mj
+
+        # ---- Electricity energy recovery (MJ -> kWh -> avoided CO2) ----
+        # Only relevant when displacing grid electricity (CO2 is applicable).
+        if (
+            factor_key == "co2_kg_per_mj"
+            and self.calorific_value_mj_per_kg is not None
+            and self.efficiency_electricity_recovery > 0
+        ):
+            grid_factor = self.data_trans.get("electricity_grid_factor", {})
+            co2_per_kwh = float(grid_factor.get("co2_kg_per_kwh", 0) or 0)
+            # Total electricity (kWh/ton) recovered from waste energy (MJ/ton)
+            total_elec_kwh = (
+                (self.efficiency_electricity_recovery / 100.0)
+                * 1000.0
+                * self.calorific_value_mj_per_kg
+                / 3.6
+            )  # MJ to kWh
+            sellable_elec_kwh = (
+                (100.0 - self.percentage_electricity_used_onsite) / 100.0
+            ) * total_elec_kwh
+            electricity_recovered = co2_per_kwh * sellable_elec_kwh
+
+        # Combine according to configured recovery mode: heat, electricity, both
+        mode = (self.energy_recovery_type or "").strip().lower()
+        if mode == "heat":
+            avoided_total = heat_recovered
+        elif mode == "electricity":
+            avoided_total = electricity_recovered
+        else:  # both or unspecified
+            avoided_total = heat_recovered + electricity_recovered
+
+        return avoided_total
+
 
     def waste_combustion_emissions(
         self, incineration_type: str, emission_type: str
@@ -161,9 +258,14 @@ class IncinerationEmissions:
         Returns:
             float: Total CH4 emissions avoided (kg CO2e).
         """
-        # Placeholder logic for CH4 emissions avoided
-        return 0.0
+        # Avoided CH4 mass (kg/ton) from recovered energy displacing fossil fuel
+        avoided_ch4 = self._calculate_avoided_emissions("ch4_kg_per_mj")
+        # Convert avoided CH4 to CO2e using 100-year GWP for fossil CH4
+        gwp_factors = self.data_trans.get("gwp_factors", {})
+        gwp_100_ch4_fossil = (gwp_factors.get("ch4_fossil", {}) or {}).get("gwp100", 0) or 0
+        return gwp_100_ch4_fossil * avoided_ch4
     
+
 
     def co2_emit_incineration(self) -> float:
         """
@@ -218,8 +320,9 @@ class IncinerationEmissions:
         Returns:
             float: Total CO2 emissions avoided (kg CO2e).
         """
-        # Placeholder logic for CO2 emissions avoided
-        return 0.0
+        # Avoided CO2 from: (a) heat displacing fossil fuel, (b) electricity
+        # displacing grid emissions (handled internally when factor_key is CO2)
+        return self._calculate_avoided_emissions("co2_kg_per_mj")
 
     def n2o_emit_incineration(self) -> float:
         """
@@ -251,8 +354,12 @@ class IncinerationEmissions:
         Returns:
             float: Total N2O emissions avoided (kg CO2e).
         """
-        # Placeholder logic for N2O emissions avoided
-        return 0.0
+        # Avoided N2O mass (kg/ton) from recovered energy displacing fossil fuel
+        avoided_n2o = self._calculate_avoided_emissions("n2o_kg_per_mj")
+        # Convert avoided N2O to CO2e using 100-year GWP
+        gwp_factors = self.data_trans.get("gwp_factors", {})
+        gwp_100_n2o = (gwp_factors.get("n2o", {}) or {}).get("gwp100", 0) or 0
+        return gwp_100_n2o * avoided_n2o
 
     def bc_emit_incineration(self):
         """
@@ -279,8 +386,8 @@ class IncinerationEmissions:
         Returns:
             float: Total BC emissions avoided (kg CO2e).
         """
-        # Placeholder logic for BC emissions avoided
-        return 0.0
+        # Avoided BC mass (kg/ton) from recovered energy displacing fossil fuel
+        return self._calculate_avoided_emissions("bc_kg_per_mj")
 
     def overall_emissions(self):
         """
