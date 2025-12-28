@@ -6,61 +6,12 @@ from .transportation import TransportationEmissions
 
 
 class LandfillEmissions:
-    # Landfill operational condition factors (default values; could be moved to JSON later)
-    _LANDFILL_PROPERTIES = {
-        'sanitary_without_gas': {'mcf': 1.0, 'ox': 0.1},
-        'sanitary_with_gas': {'mcf': 1.0, 'ox': 0.1},
-        'managed_semi_aerobic': {'mcf': 0.5, 'ox': 0.0},
-        'open_dumping_deep': {'mcf': 0.8, 'ox': 0.0},
-        'open_dumping_shallow': {'mcf': 0.4, 'ox': 0.0},
-        'uncategorized': {'mcf': 0.6, 'ox': 0.0},
-    }
-
-    # Waste properties with DOC fraction, composition (% of total), and first-order decay rate constant k
-    _WASTE_PROPERTIES = {
-        'food': {'doc': 0.152, 'composition': 40.30,'rate_constant': 0.4},
-        'garden': {'doc': 0.196, 'composition': 0.0, 'rate_constant': 0.17},
-        'plastic': {'doc': 0.0, 'composition': 6.4, 'rate_constant': 0.0},
-        'paper': {'doc': 0.41, 'composition': 11.30, 'rate_constant': 0.07},
-        'textile': {'doc': 0.32, 'composition': 2.5, 'rate_constant': 0.07},
-        'rubber': {'doc': 0.45024, 'composition': 0.8, 'rate_constant': 0.035},
-        'glass': {'doc': 0.0, 'composition': 3.5, 'rate_constant': 0.0},
-        'metal': {'doc': 0.0, 'composition': 3.8, 'rate_constant': 0.0},
-        'nappies': {'doc': 0.252, 'composition': 0.0, 'rate_constant': 0.17},
-        'wood': {'doc': 0.425, 'composition': 7.9, 'rate_constant': 0.035},
-        'hazardous': {'doc': 0.0, 'composition': 0.0, 'rate_constant': 0.0},
-        'others': {'doc': 0.0, 'composition': 21.9, 'rate_constant': 0.0},
-    }
-
-    # Default constants
-    _DOCF = 0.5  # Fraction of DOC decomposing under anaerobic conditions
-    _F_CH4 = 0.5  # Fraction of CH4 in landfill gas
 
     def _gwp100(self, key: str) -> float:
         """Return GWP100 using the exact JSON key from transportation data."""
         gwp = self.data_trans.get("gwp_factors", {})
         return gwp.get(key, {}).get("gwp100", 0)
-    """
-    A class to calculate GHG emissions (CH₄, CO₂, N₂O, BC) from landfill operations.
 
-    Attributes:
-        waste_disposed (float): Amount of waste disposed at the site (tons).
-        waste_disposed_fired (float): Percentage of waste disposed via open burning (tons).
-        landfill_type (str): Type of landfill (e.g., "landfill", "open dump").
-        start_year (int): Starting year of waste disposal.
-        end_year (int): End year of waste disposal.
-        current_year (int): Current year of disposal.
-        annual_growth_rate (float): Estimated growth of annual disposal at the landfill (%).
-        fossil_fuel_types (list[str]): Types of fossil fuels used for operation activities.
-        fossil_fuel_consumed (list[float]): Consumption of fossil fuels used for operation activities (liters).
-        electricity_kwh_per_day (float): Grid electricity used for operation activities (kWh).
-        gas_collection_efficiency (float): Efficiency of gas collection (%).
-        gas_treatment_method (str): Treatment method of collected landfill gas.
-        lfg_utilization_efficiency (float): LFG utilization efficiency (e.g., electricity production, flare efficiency).
-        gas_recovery_start_year (int): Starting year of gas recovery after commencing the landfill.
-        gas_recovery_end_year (int): Closing year of gas recovery project.
-        replaced_fossil_fuel_type (str): Type of fossil fuel replaced by recovered LFG.
-    """
 
     def __init__(
         self,
@@ -140,16 +91,24 @@ class LandfillEmissions:
         self.gas_recovery_start_year = gas_recovery_start_year
         self.gas_recovery_end_year = gas_recovery_end_year
         self.replaced_fossil_fuel_type = replaced_fossil_fuel_type
-        self._composition_map = self._build_default_composition_map()
-        if mix_waste_composition:
-            self._apply_mix_composition(mix_waste_composition)
 
-        # Load emission factor data
+        # Load emission factor and landfill configuration data
         self.trans_file = Path(__file__).parent.parent / "data" / "transportation.json"
         self.landfill_file = Path(__file__).parent.parent / "data" / "landfill.json"
 
         self.data_landfill = self._load_json_file(self.landfill_file)
         self.data_trans = self._load_json_file(self.trans_file)
+
+        # Load all landfill configuration constants strictly from JSON
+        self._LANDFILL_PROPERTIES = self.data_landfill["landfill_properties"]
+        self._WASTE_PROPERTIES = self.data_landfill["waste_properties"]
+        self._DOCF = float(self.data_landfill["docf"])  # Fraction of DOC decomposing
+        self._F_CH4 = float(self.data_landfill["f_ch4"])  # Fraction of CH4 in landfill gas
+
+        # Initialize waste composition map using configured waste properties
+        self._composition_map = self._build_default_composition_map()
+        if mix_waste_composition:
+            self._apply_mix_composition(mix_waste_composition)
 
     def _build_default_composition_map(self) -> dict:
         """Return a name->percentage map from default _WASTE_PROPERTIES."""
@@ -169,18 +128,9 @@ class LandfillEmissions:
         to our known categories. Unspecified categories default to 0, and any remainder is
         assigned to 'others'.
         """
-        # Accept common aliases
-        alias_map = {
-            'plastic': 'plastic',
-            'rubber': 'rubber',
-            'nappies': 'nappies',
-            'hazardous': 'hazardous',
-            'others': 'others',
-        }
         cleaned: dict[str, float] = {}
         for k, v in (mix or {}).items():
             key = str(k).strip().lower()
-            key = alias_map.get(key, key)
             cleaned[key] = max(0.0, float(v))
 
         # Only keep known categories
@@ -262,6 +212,77 @@ class LandfillEmissions:
 
         return total_emissions / amount_deposited if amount_deposited > 0 else 0
     
+    def _calculate_avoided_emissions(self, factor_key: str) -> float:
+
+        if self.landfill_type == "sanitary_with_gas":
+
+
+            method = self.gas_treatment_method
+
+            # Defaults to robustly handle missing inputs and partial configs
+            heat_recovered = 0.0
+            electricity_recovered = 0.0
+
+            # Electricity grid emission factor (kg CO2/kWh)
+            grid_factor = self.data_trans.get("electricity_grid_factor", {})
+            co2_per_kwh = float(grid_factor.get("co2_kg_per_kwh", 0) or 0)
+            #methane energy content (GJ/m3)
+            methane_energy_content = self.data_landfill.get("landfill_avoided_emissions", {}).get("ch4_energy_content_gj_per_m3")
+            # methane density (kg/m3)
+            methane_density = self.data_landfill.get("landfill_avoided_emissions", {}).get("methane_density_kg_per_m3")
+            # ---- Heat energy recovery (MJ -> avoided pollutant mass) ----
+            fuel_data = self.data_landfill.get("fuel_data", [])
+            fuel_obj = next( (f for f in fuel_data if f.get("fuel_type") == self.replaced_fossil_fuel_type),None,)
+
+            if fuel_obj:
+                emission_factor = float(
+                    (fuel_obj.get("emission_factors", {}) or {}).get(
+                        factor_key, 0
+                    )
+                    or 0
+                )
+
+                # fuel energy content (MJ/liter)
+                energy_content = float(fuel_obj.get("energy_content_mj_per_l"))
+
+                # biogenic CH4 mass (kg CH4/ton) , total waste deposited (ton) ,ch4 avoided by lfg (kg)
+                _ , waste_deposited, ch4_avoided_by_lfg = self._biogenic_ch4_mass_per_ton()
+
+                # volume of methane collected in lfg (m3)
+                ch4_collected_in_lfg = ch4_avoided_by_lfg / (methane_density )
+                # total methane avoided (kg CH4/ton)
+                total_methane_avoided = (ch4_avoided_by_lfg / (waste_deposited *1000))
+                # heat production using boiler(MJ/tonne)
+                exportable_heat = methane_energy_content * 1000 * total_methane_avoided / methane_density
+                # fuel quantity replaced (liter/tonne)
+                fuel_quantity_replaced = exportable_heat / energy_content
+                # heat recovered (kg /tonne)
+                heat_recovered = emission_factor * energy_content * fuel_quantity_replaced
+
+                # biogenic CH4 avoided (kg CH4/ton)
+                if factor_key == "ch4_kg_per_mj":
+                    avoided_total_biogenic = total_methane_avoided
+                else:
+                    avoided_total_biogenic = 0.0
+
+            # ---- Electricity energy recovery (MJ -> kWh -> avoided CO2) ----
+            # Only relevant when displacing grid electricity (CO2 is applicable).
+            if method=="electricity" and (factor_key == "co2_kg_per_mj"):
+                electricity_potential = ch4_collected_in_lfg* methane_energy_content * (self.lfg_utilization_efficiency / 100) / 3.6
+                electricity_production = electricity_potential / (waste_deposited * 1000)
+                electricity_recovered = electricity_production * 1000 * co2_per_kwh 
+            else:
+                electricity_recovered = 0.0 
+            avoided_total_fossil = electricity_recovered 
+             
+            if method == "lfg_heating" or method == "direct_use":
+                avoided_total_fossil = heat_recovered + avoided_total_fossil
+        else:
+            avoided_total_fossil = 0.0
+            avoided_total_biogenic = 0.0         
+
+        return avoided_total_fossil, avoided_total_biogenic
+    
     def _biogenic_ch4_mass_per_ton(self) -> float:
         """Return biogenic CH₄ mass (kg CH₄ per ton waste) using first-order decay.
 
@@ -269,9 +290,9 @@ class LandfillEmissions:
         conversion to the caller.
         """
         # Amount of waste actually landfilled (excluding open burning)
-        waste_burned_pct = self.waste_disposed_fired  # treated as percent
+        waste_burned_percent = self.waste_disposed_fired  
         waste_deposited = self.waste_disposed
-        landfill_waste_daily_gg = waste_deposited * (100 - waste_burned_pct) * 0.01 * 0.001  # Gg/day
+        landfill_waste_daily_gg = waste_deposited * (100 - waste_burned_percent) * 0.01 * 0.001 
 
         props = self._LANDFILL_PROPERTIES.get(
             self.landfill_type,
@@ -279,6 +300,8 @@ class LandfillEmissions:
         )
         mcf = props['mcf']
         ox = props['ox']
+        methane_density = self.data_landfill.get("landfill_avoided_emissions", {}).get("methane_density_kg_per_m3")
+        ch4_vol_in_lfg_percent = self.data_landfill.get("landfill_avoided_emissions", {}).get("ch4_vol_in_lfg_percent")
 
         # Growth adjusted initial annual waste (Gg/year)
         w0 = (landfill_waste_daily_gg * 365) / (1 + 0.01 * self.annual_growth_rate) ** (
@@ -291,6 +314,7 @@ class LandfillEmissions:
         for name, vals in self._WASTE_PROPERTIES.items():
             comp_pct = self._composition_map.get(name, vals.get('composition', 0.0))
             weighted_doc += (comp_pct / 100.0) * vals['doc']
+
 
         # Weighted decay rate constant k
         k_weighted = 0.0
@@ -305,7 +329,8 @@ class LandfillEmissions:
         total_ch4_generated = 0.0
         h_last = w0 * weighted_doc * self._DOCF * mcf  # initial DDOCm accumulated
 
-        for i in range(1, 101):  # 100-year horizon
+        ch4_year_store = []
+        for i in range(1, 100):  # 100-year horizon
             year = self.start_year + i
             if year > self.end_year:
                 w = 0.0
@@ -317,28 +342,59 @@ class LandfillEmissions:
 
             # Decomposable DOC deposited (DDOCm)
             d = w * weighted_doc * self._DOCF * mcf
-            # Assume immediate fraction reacting (simplified: all new deposit subject to future decay)
             # Accumulated at end of year
             h = (d) + h_last * exp_decay
             # DDOCm decomposed during year
             e = (h_last * (1 - exp_decay))
             # CH4 generated (Gg CH4)
             ch4_year = e * self._F_CH4 * 16 / 12
+            # append for later use
+            ch4_year_store.append(ch4_year)
+
             total_ch4_generated += ch4_year
             total_waste_deposited += w
             h_last = h
 
         total_waste_deposited += initial_deposit
 
-        # Oxidation adjustment (fugitive share)
-        ch4_fugitive = total_ch4_generated * (1 - ox)  # Gg CH4
-        # Convert Gg CH4 to kg CH4 per ton waste: 1 Gg = 1e9 g = 1e6 kg
-        kg_ch4_total = ch4_fugitive * 1_000_000.0
-        # total waste deposited (w) was in Gg/year, convert to tonnes: 1 Gg = 1e6 kg = 1000 tonnes
-        tonnes_waste = total_waste_deposited * 1000.0
-        kg_ch4_per_ton = kg_ch4_total / tonnes_waste if tonnes_waste > 0 else 0.0
+        # Calculate CH4 during gas recovery project years
+        if self.landfill_type == "sanitary_with_gas":
+            start_index =  self.gas_recovery_start_year - self.start_year - 1
+            end_index = start_index + ((self.gas_recovery_end_year + 1) - self.gas_recovery_start_year)
+            ch4_during_project = sum(ch4_year_store[start_index:end_index]) * 1000 * (1 - ox)
+        else:
+            ch4_during_project = 0.0
 
-        return kg_ch4_per_ton
+        # volume of methane (m3)     
+        ch4_vol = ch4_during_project * 1000 /  methane_density  
+
+        # volume of landfill gas (m3)
+        lfg_vol = ch4_vol / (ch4_vol_in_lfg_percent / 100.0)
+
+        # collected landfill gas (m3)
+        collected_lfg = lfg_vol * (self.gas_collection_efficiency / 100.0)
+
+        # methane in collected landfill gas (m3)
+        ch4_collected_in_lfg = collected_lfg * ch4_vol_in_lfg_percent / 100.0
+        
+        # total avoided methane by utilizing lfg (kg)
+        if "electricity"== self.gas_treatment_method:
+            ch4_avoided_by_lfg = methane_density * ch4_collected_in_lfg
+        else:
+            ch4_avoided_by_lfg = methane_density * ch4_collected_in_lfg *self.lfg_utilization_efficiency / 100.0
+
+
+        # total ch4 emission potential (after oxidation) in tonnes
+        ch4_emissions_potential = total_ch4_generated * (1 - ox) * 1000 
+
+        # uncollected and fugitive CH4 (kg)
+        uncollected_and_fugitive_ch4 = (ch4_emissions_potential * 1000) - ch4_avoided_by_lfg 
+        
+        # total waste deposited (w) was in Gg/year, convert to tonnes: 1 Gg = 1e6 kg = 1000 tonnes 
+        kg_ch4_per_ton = uncollected_and_fugitive_ch4 / (total_waste_deposited * 1000.0) if total_waste_deposited > 0 else 0.0
+        
+
+        return kg_ch4_per_ton , total_waste_deposited, ch4_avoided_by_lfg
 
     def ch4_emit_landfill(self) -> float:
         """Calculate total CH₄ emissions (kg CO₂-eq) per ton of waste landfilled.
@@ -361,7 +417,7 @@ class LandfillEmissions:
         ch4_fossil_co2e = ch4_fossil_mass * gwp_100_fossil
 
         # Biogenic CH4 (already returned as kg CH4 per ton); convert using biogenic GWP
-        ch4_biogenic_mass = self._biogenic_ch4_mass_per_ton()
+        ch4_biogenic_mass, _, _ = self._biogenic_ch4_mass_per_ton()
         gwp_100_biogenic = self._gwp100("ch4_biogenic")
         ch4_biogenic_co2e = ch4_biogenic_mass * gwp_100_biogenic
 
@@ -371,15 +427,19 @@ class LandfillEmissions:
 
         return ch4_fossil_co2e + ch4_biogenic_co2e
 
-
     def ch4_avoid_landfill(self):
         """
         Calculate CH₄ emissions avoided per ton of waste landfilled.
 
+        Uses `_calculate_avoided_emissions("ch4_kg_per_mj")` to estimate avoided
+        CH₄ mass (kg CH₄/ton) from recovered energy displacing fossil fuel, then
+        converts to CO₂-e using GWP100 for fossil CH₄.
+
         Returns:
-            float: Avoided CH₄ emissions (to be implemented).
+            float: Avoided CH₄ emissions (kg CO₂-eq per ton).
         """
-        return 0.0  # Placeholder for avoided CH₄ emissions calculation
+        avoided_ch4_fossil, avoided_ch4_biogenic = self._calculate_avoided_emissions("ch4_kg_per_mj")
+        return avoided_ch4_fossil * self._gwp100("ch4_fossil") + avoided_ch4_biogenic * self._gwp100("ch4_biogenic")
 
     def co2_emit_landfill(self) -> float:
         """
@@ -407,10 +467,16 @@ class LandfillEmissions:
         """
         Calculate avoided CO₂ emissions (kg CO₂-eq) per ton of waste landfilled.
 
+        Uses `_calculate_avoided_emissions("co2_kg_per_mj")` to combine:
+        - Heat recovery displacing fossil fuel CO₂
+        - Electricity recovery displacing grid CO₂ (handled internally)
+
         Returns:
-            float: Avoided CO₂ emissions (to be implemented).
+            float: Avoided CO₂ emissions (kg CO₂-eq per ton).
         """
-        return 0.0
+        co2_fossil, _ = self._calculate_avoided_emissions("co2_kg_per_mj")
+
+        return co2_fossil
 
     def n2o_emit_landfill(self) -> float:
         """
@@ -432,10 +498,16 @@ class LandfillEmissions:
         """
         Calculate avoided N₂O emissions (kg CO₂-eq) per ton of waste landfilled.
 
+        Uses `_calculate_avoided_emissions("n2o_kg_per_mj")` to estimate avoided
+        N₂O mass (kg N₂O/ton) from recovered energy displacing fossil fuel, then
+        converts to CO₂-e using GWP100 for N₂O.
+
         Returns:
-            float: Avoided N₂O emissions (to be implemented).
+            float: Avoided N₂O emissions (kg CO₂-eq per ton).
         """
-        return 0.0
+        avoided_n2o_fossil, _ = self._calculate_avoided_emissions("n2o_kg_per_mj")
+        gwp_100_n2o = self._gwp100("n2o")
+        return avoided_n2o_fossil * gwp_100_n2o
 
     def bc_emit_landfill(self) -> float:
         """
@@ -454,12 +526,17 @@ class LandfillEmissions:
 
     def bc_avoid_landfill(self):
         """
-        Calculate avoided black carbon (BC) emissions (kg CO₂-eq) per ton of waste landfilled.
+        Calculate avoided black carbon (BC) emissions per ton of waste landfilled.
+
+        Uses `_calculate_avoided_emissions("bc_kg_per_mj")` to estimate avoided
+        BC (consistent units with the emission factor; treated as CO₂-eq if the
+        factor is defined as such in data).
 
         Returns:
-            float: Avoided BC emissions (to be implemented).
+            float: Avoided BC emissions per ton (unit aligns with factor data).
         """
-        return 0.0  # Placeholder for avoided BC emissions calculation
+        avoided_bc_fossil, _ = self._calculate_avoided_emissions("bc_kg_per_mj")
+        return avoided_bc_fossil
 
     def overall_emissions(self) -> dict:
         """

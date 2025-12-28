@@ -69,5 +69,36 @@
     ],
     "electricity_grid_factor": {
         "co2_kg_per_kwh": 0.904746
-    }
+    },
+    "landfill_avoided_emissions": {
+        "methane_density_kg_per_m3": 0.7168,
+        "ch4_vol_in_lfg_percent": 60,
+        "ch4_energy_content_gj_per_m3": 0.037,
+        "energy_conversion_factor_gj_per_mkh": 3.6,
+        "electricity_production_percent": 35
+    },
+    "landfill_properties": {
+        "sanitary_without_gas": { "mcf": 1.0, "ox": 0.1 },
+        "sanitary_with_gas": { "mcf": 1.0, "ox": 0.1 },
+        "managed_semi_aerobic": { "mcf": 0.5, "ox": 0.0 },
+        "open_dumping_deep": { "mcf": 0.8, "ox": 0.0 },
+        "open_dumping_shallow": { "mcf": 0.4, "ox": 0.0 },
+        "uncategorized": { "mcf": 0.6, "ox": 0.0 }
+    },
+    "waste_properties": {
+        "food": { "doc": 0.152, "composition": 40.30, "rate_constant": 0.4 },
+        "garden": { "doc": 0.196, "composition": 0.0, "rate_constant": 0.17 },
+        "plastic": { "doc": 0.0, "composition": 6.4, "rate_constant": 0.0 },
+        "paper": { "doc": 0.41, "composition": 11.30, "rate_constant": 0.07 },
+        "textile": { "doc": 0.32, "composition": 2.5, "rate_constant": 0.07 },
+        "rubber": { "doc": 0.45024, "composition": 0.8, "rate_constant": 0.035 },
+        "glass": { "doc": 0.0, "composition": 3.5, "rate_constant": 0.0 },
+        "metal": { "doc": 0.0, "composition": 3.8, "rate_constant": 0.0 },
+        "nappies": { "doc": 0.252, "composition": 0.0, "rate_constant": 0.17 },
+        "wood": { "doc": 0.425, "composition": 7.9, "rate_constant": 0.035 },
+        "hazardous": { "doc": 0.0, "composition": 0.0, "rate_constant": 0.0 },
+        "others": { "doc": 0.0, "composition": 21.9, "rate_constant": 0.0 }
+    },
+    "docf": 0.5,
+    "f_ch4": 0.5
 }
