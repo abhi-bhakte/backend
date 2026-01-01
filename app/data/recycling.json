@@ -75,5 +75,53 @@
     ],
     "electricity_grid_factor": {
         "co2_kg_eq_per_kwh": 0.904746
+    },
+    "virgin_material_production": {
+        "paper": {
+            "corrugated_containers_percent": 48,
+            "corrugated_containers_co2_kg_per_tonne": 0.84,
+            "magazines_mail_percent": 8,
+            "magazines_mail_co2_kg_per_tonne": 1.64,
+            "newspapers_percent": 24,
+            "newspapers_co2_kg_per_tonne": 2.01,
+            "office_paper_percent": 20,
+            "office_paper_co2_kg_per_tonne": 0.99,
+            "total_energy_requirement_mj_per_ton": 34219,
+            "energy_supply_from_biomass_percent": 40,
+            "energy_supply_from_cng_percent": 50,
+            "energy_supply_from_fossil_fuel_percent": 50,
+            "pm2.5_dried_pulp_kg_per_mg": 0.6,
+            "bc_pm2.5_dried_pulp_percent": 2.6
+        },
+        "plastic": {
+            "fossil_energy_hdpe_gj_per_tonne": 15,
+            "electric_energy_hdpe_mwh_per_tonne": 0.83,
+            "fossil_energy_ldpe_gj_per_tonne": 15,
+            "electric_energy_ldpe_mwh_per_tonne": 1.67,
+            "fossil_energy_pp_gj_per_tonne": 11.6,
+            "electric_energy_pp_mwh_per_tonne": 0.56,
+            "fossil_energy_pet_gj_per_tonne": 15,
+            "electric_energy_pet_mwh_per_tonne": 1.11
+
+        },
+        "aluminum": {
+           "bc_emission_kg_per_tonne": 0.05658,
+           "n2o_emission_kg_per_tonne": 0.011,
+           "co2_fossil_emission_kg_per_tonne":1488.2,
+           "electric_emission_kwh_per_tonne": 15549.78,
+           "ch4_emission_kg_per_tonne": 0.069
+        },
+        "steel" : {
+            "coal_used_kg_per_tonne":666.78152,
+            "cng_used_m3_per_tonne": 64.5645,
+            "coal_calorific_value_mj_per_kg": 29.02
+        },
+        "glass" : {
+            "bc_emission_kg_per_tonne": 0.0001488,
+           "n2o_emission_kg_per_tonne": 0.004934421,
+           "co2_fossil_emission_kg_per_tonne":609.4010143330,
+           "ch4_emission_kg_per_tonne": 0.0246721058
+        }
+
     }
 }
