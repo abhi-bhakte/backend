@@ -13,7 +13,10 @@ async def create_or_update_profile(profile: UserProfile, db=Depends(get_db), cur
     profile.user_id = str(current_user["_id"])
     result = await db[COLLECTION_NAME].update_one(
         {"user_id": profile.user_id},
-        {"$set": profile.dict()},
+        {
+            "$set": profile.dict(),
+            "$unset": {"energyInputs": ""}  # Remove old top-level energyInputs
+        },
         upsert=True
     )
     # Fetch the profile to get the MongoDB _id
@@ -56,7 +59,10 @@ async def update_profile_by_id(profile_id: str, profile: UserProfile, db=Depends
     user_id = str(current_user["_id"])
     result = await db[COLLECTION_NAME].update_one(
         {"_id": ObjectId(profile_id), "user_id": user_id},
-        {"$set": profile.dict()}
+        {
+            "$set": profile.dict(),
+            "$unset": {"energyInputs": ""}  # Remove old top-level energyInputs
+        }
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Profile not found or not authorized")

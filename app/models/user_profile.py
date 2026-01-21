@@ -28,10 +28,17 @@ class Transportation(BaseModel):
     fuelsUsed: List[str]
     transferStationFuels: List[str] = Field(default_factory=list)
 
+class TransportationData(BaseModel):
+    enabled: bool = False
+    vehicleType: str = ""
+    fuelsUsed: List[str] = Field(default_factory=list)
+
 class Composting(BaseModel):
     compostProduction: str
     compostUsed: str
     fuelsUsed: List[str]
+    inputTransport: TransportationData = Field(default_factory=TransportationData)
+    outputTransport: TransportationData = Field(default_factory=TransportationData)
 
 class AnaerobicDigestion(BaseModel):
     energyProduct: str
@@ -39,37 +46,57 @@ class AnaerobicDigestion(BaseModel):
     compostRecoveryOption: str
     compostRecoveryPercentage: str
     fuelsUsed: List[str]
+    inputTransport: TransportationData = Field(default_factory=TransportationData)
+    outputTransport: TransportationData = Field(default_factory=TransportationData)
 
 class RecyclingFormal(BaseModel):
     paper: str
     plastic: str
     aluminum: str
-    steel: str
+    metal: str = Field(validation_alias='steel')
     glass: str
+
+    class Config:
+        populate_by_name = True  # Allow both 'metal' and 'steel'
 
 class RecyclingInformal(BaseModel):
     paper: str
     plastic: str
     aluminum: str
-    steel: str
+    metal: str = Field(validation_alias='steel')
     glass: str
+
+    class Config:
+        populate_by_name = True  # Allow both 'metal' and 'steel'
 
 class Recycling(BaseModel):
     formal: RecyclingFormal
     informal: RecyclingInformal
+    inputTransport: TransportationData = Field(default_factory=TransportationData)
+    outputTransport: TransportationData = Field(default_factory=TransportationData)
+    energyInputs: Optional['EnergyInputs'] = None
 
 class EnergyInput(BaseModel):
-    petrol: bool
-    diesel: bool
-    cng: bool
-    coal: bool
+    petrol: bool = False
+    diesel: bool = False
+    cng: bool = False
+    coal: bool = False
+    petrolAmount: Optional[str] = ""
+    dieselAmount: Optional[str] = ""
+    cngAmount: Optional[str] = ""
+    coalAmount: Optional[str] = ""
+    electricityAmount: Optional[str] = ""
+    recyclability: Optional[str] = ""
 
 class EnergyInputs(BaseModel):
-    paper: EnergyInput
-    plastic: EnergyInput
-    aluminum: EnergyInput
-    steel: EnergyInput
-    glass: EnergyInput
+    paper: EnergyInput = Field(default_factory=EnergyInput)
+    plastic: EnergyInput = Field(default_factory=EnergyInput)
+    aluminum: EnergyInput = Field(default_factory=EnergyInput)
+    metal: EnergyInput = Field(default_factory=EnergyInput, validation_alias='steel')
+    glass: EnergyInput = Field(default_factory=EnergyInput)
+
+    class Config:
+        populate_by_name = True  # Allow both 'metal' and 'steel'
 
 class Incineration(BaseModel):
     caloricValue: str
@@ -80,6 +107,9 @@ class Incineration(BaseModel):
     heatEfficiency: str
     recoveredHeatUsed: str
     fossilFuelReplaced: str
+    fuelsUsed: List[str] = Field(default_factory=list)
+    inputTransport: TransportationData = Field(default_factory=TransportationData)
+    outputTransport: TransportationData = Field(default_factory=TransportationData)
 
 class Landfill(BaseModel):
     landfillType: str
@@ -93,6 +123,7 @@ class Landfill(BaseModel):
     lfgUtilizationEfficiency: str
     gasRecoveryStartYear: str
     gasRecoveryEndYear: str
+    fuelsUsed: List[str] = Field(default_factory=list)
 
 class UserProfile(BaseModel):
     user_id: str
@@ -102,6 +133,5 @@ class UserProfile(BaseModel):
     composting: Composting
     anaerobicDigestion: AnaerobicDigestion
     recycling: Recycling
-    energyInputs: EnergyInputs
     incineration: Incineration
     landfill: Landfill
