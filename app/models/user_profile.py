@@ -127,6 +127,7 @@ class Landfill(BaseModel):
 
 class UserProfile(BaseModel):
     user_id: str
+    language: Optional[str] = "en"
     cityData: CityData
     wasteComposition: WasteComposition
     transportation: Transportation
