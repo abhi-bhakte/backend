@@ -32,6 +32,7 @@ def register_routes(app: FastAPI):
         allow_credentials=True,
         allow_methods=["*"],  # Allow all HTTP methods
         allow_headers=["*"],  # Allow all headers
+        expose_headers=["Retry-After"],
     )
     
 

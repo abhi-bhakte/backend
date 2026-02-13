@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Response, Body, Path
+from datetime import datetime, timedelta
 from pydantic import BaseModel, EmailStr, Field
 from app.db.db import get_db
 from app.utils.auth import (
@@ -12,6 +13,28 @@ from bson import ObjectId
 from fastapi.encoders import jsonable_encoder
 
 router = APIRouter()
+
+LOCK_WINDOW_MINUTES = 10
+INITIAL_LOCK_THRESHOLD = 6
+FOLLOWUP_LOCK_THRESHOLD = 3
+LOCK_DURATIONS_MINUTES = [10, 20, 30, 60, 60]
+
+
+async def _get_login_guard(db: AsyncIOMotorDatabase, email: str) -> dict:
+    return await db["login_attempts"].find_one({"email": email})
+
+
+async def _save_login_guard(db: AsyncIOMotorDatabase, email: str, guard: dict) -> None:
+    await db["login_attempts"].update_one(
+        {"email": email},
+        {"$set": guard},
+        upsert=True,
+    )
+
+
+def _lock_duration_for_stage(stage: int) -> int:
+    index = max(0, min(stage - 1, len(LOCK_DURATIONS_MINUTES) - 1))
+    return LOCK_DURATIONS_MINUTES[index]
 
 
 # Request & Response Schemas
@@ -74,18 +97,32 @@ async def login_user(
     email = request.email.lower()
     password = request.password
 
+    guard = await _get_login_guard(db, email)
+    now = datetime.utcnow()
+    if guard and guard.get("locked_until") and guard["locked_until"] > now:
+        retry_after = int((guard["locked_until"] - now).total_seconds())
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Account temporarily locked. Try again later.",
+            headers={"Retry-After": str(max(retry_after, 1))},
+        )
+
     user = await db["users"].find_one({"email": email})
     if not user:
+        await _record_login_failure(db, email, now)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
 
     if not verify_password(password, user["hashed_password"]):
+        await _record_login_failure(db, email, now)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect password"
         )
+
+    await db["login_attempts"].delete_one({"email": email})
 
     access_token = create_access_token(data={
         "sub": user["email"],
@@ -98,6 +135,33 @@ async def login_user(
         access_token=access_token,
         message="Login successful"
     )
+
+
+async def _record_login_failure(db: AsyncIOMotorDatabase, email: str, now: datetime) -> None:
+    guard = await _get_login_guard(db, email) or {
+        "email": email,
+        "failed_count": 0,
+        "window_start": now,
+        "locked_until": None,
+        "lock_stage": 0,
+    }
+
+    window_start = guard.get("window_start") or now
+    if now - window_start > timedelta(minutes=LOCK_WINDOW_MINUTES):
+        guard["failed_count"] = 0
+        guard["window_start"] = now
+
+    guard["failed_count"] = guard.get("failed_count", 0) + 1
+
+    threshold = INITIAL_LOCK_THRESHOLD if guard.get("lock_stage", 0) == 0 else FOLLOWUP_LOCK_THRESHOLD
+    if guard["failed_count"] >= threshold:
+        guard["lock_stage"] = min(guard.get("lock_stage", 0) + 1, len(LOCK_DURATIONS_MINUTES))
+        duration_minutes = _lock_duration_for_stage(guard["lock_stage"])
+        guard["locked_until"] = now + timedelta(minutes=duration_minutes)
+        guard["failed_count"] = 0
+        guard["window_start"] = now
+
+    await _save_login_guard(db, email, guard)
 
 
 # 🔐 Register Endpoint
