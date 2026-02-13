@@ -203,7 +203,11 @@ async def get_city_summary_service(city_name, start_date, end_date, db):
         for date_str in date_list
     ]
 
-    waste_diverted_cumulative = sum(waste_allocation_totals.values())
+    # Waste diverted excludes landfill (sum of all treatments except landfill)
+    waste_diverted_cumulative = sum(
+        v for k, v in waste_allocation_totals.items()
+        if normalize_method_name(k) not in ("landfill", "landfilling")
+    )
 
     dry_percent_cumulative = (
         round(dry_percent_sum / percent_days_count, 2) if percent_days_count else None
